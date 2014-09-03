@@ -1,4 +1,4 @@
-= License (2-clause BSD License)
+# Gogyou License (2-clause BSD License)
 
 ----
 
