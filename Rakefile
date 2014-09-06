@@ -35,7 +35,7 @@ task :default => :all
 task :all => GEMFILE
 
 task :rdoc => DOC + EXT + LIB do
-  sh *(%w(rdoc) + GEMSTUB.rdoc_options + DOC + EXT + LIB + EXAMPLE)
+  sh *(%w(rdoc) + GEMSTUB.rdoc_options + DOC + EXT + LIB)
 end
 
 file GEMFILE => DOC + EXT + EXTCONF + BIN + LIB + SPEC + EXAMPLE + RAKEFILE + [GEMSPEC] do

@@ -66,6 +66,52 @@ describe Gogyou::Model do
 
     expect(x::MODEL).to eq ref
   end
+
+  it "nested struct with array" do
+    x = Gogyou.struct {
+      char :a
+      union {
+        int :b
+        struct -> {
+          int64_t :c
+          int32_t :d
+        }, :e, 4
+      }
+    }
+
+    ref = Gogyou::Model::Struct[
+      72, 8,
+      Gogyou::Model::Field[0, :a, nil, Gogyou::Primitives::CHAR, 0x00],
+      Gogyou::Model::Field[8, :b, nil, Gogyou::Primitives::INT, 0x00],
+      Gogyou::Model::Field[8, :e, [4], Gogyou::Model::Struct[
+        16, 8,
+        Gogyou::Model::Field[0, :c, nil, Gogyou::Primitives::INT64_T, 0x00],
+        Gogyou::Model::Field[8, :d, nil, Gogyou::Primitives::INT32_T, 0x00]], 0x00]]
+    expect(x::MODEL).to eq ref
+  end
+
+  it "nested struct in union" do
+    x = Gogyou.struct {
+      char :a
+      union {
+        int :b
+        struct {
+          int64_t :c
+          int32_t :d
+        }
+      }
+    }
+
+    y = Gogyou.union {
+      struct x, :a, :b
+    }
+
+    ref = Gogyou::Model::Union[
+      24, 8,
+      Gogyou::Model::Field[0, :a, nil, x, 0x00],
+      Gogyou::Model::Field[0, :b, nil, x, 0x00]]
+    expect(y::MODEL).to eq ref
+  end
 end
 
 describe Gogyou::Accessor do

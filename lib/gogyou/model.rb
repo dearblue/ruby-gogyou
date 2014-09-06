@@ -240,8 +240,6 @@ module Gogyou
             #define_method(:method_missing, ->(type, *args) { latest_fields = creator.addfield(type, args); nil })
             creator.typemap.each_key do |t|
               define_method(t, ->(*args) { latest_fields = creator.addfield(t, args); nil })
-              tt = :"#{t}!"
-              define_method(tt, ->(*args) { latest_fields = creator.addfield(tt, args); nil })
             end
             define_method(:struct, ->(*args, &block) { latest_fields = creator.struct(args, &block); nil })
             define_method(:union, ->(*args, &block) { latest_fields = creator.union(args, &block); nil })
@@ -376,10 +374,7 @@ module Gogyou
       def addfield(type, args)
         typeobj = typemap[type.intern]
         unless typeobj
-          typeobj = typemap[type.to_s.sub(/!$/, "").intern]
-          unless typeobj
-            raise NoMethodError, "typename or method is missing (#{type})"
-          end
+          raise NoMethodError, "typename or method is missing (#{type})"
         end
 
         addfield!(typeobj, args)

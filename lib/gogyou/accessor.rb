@@ -225,7 +225,7 @@ module Gogyou
 
     class Struct < BasicStruct
       def self.aref(buffer, offset)
-        self::MODEL.aref(buffer, offset)
+        new(buffer, offset)
       end
 
       def self.aset(buffer, offset, data)
@@ -259,7 +259,10 @@ module Gogyou
             type = field.type
           end
 
-          type.name # すでに名前が定義されてる場合はこれで固定される
+          if type.kind_of?(::Module)
+            # すでに名前が定義されてる場合はこれで固定される
+            type.name
+          end
           const_set(:SUBTYPE, type)
           bytesize = type.bytesize
 
