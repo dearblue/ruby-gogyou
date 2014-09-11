@@ -148,6 +148,9 @@ module Gogyou
     def self.define_accessors(accessorclass, model)
       accessorclass.class_eval do
         namecheck = {}
+        fieldsize = model.fields.size
+        define_method(:size__GOGYOU__, -> { fieldsize })
+        alias_method(:size, :size__GOGYOU__)
         model.fields.each do |field|
           name = field.name
           #raise NameError, "wrong field name - #{name}" unless name =~ /\A[A-Za-z_][A-Za-z_0-9]*\Z/
@@ -267,13 +270,13 @@ module Gogyou
           bytesize = type.bytesize
 
           if model.bytesize == 0
-            check_index = ->(index) do
+            define_method(:check_index, ->(index) {
               index = index.to_i
               unless index >= 0 && index < self.size
                 raise IndexError, "out of element size (index #{index} for 0 ... #{self.size})", caller(2)
               end
               index
-            end
+            })
 
             define_method(:<<, ->(value) {
               raise TypeError, "immutable object (#<%s:0x%08X>)" % [self.class, __id__], caller(2) if frozen?
@@ -292,27 +295,31 @@ module Gogyou
               (buffer__GOGYOU__.bytesize - offset__GOGYOU__).align_floor(type.bytesize)
             })
           else
-            check_index = ->(index) do
-              index = index.to_i
-              unless index >= 0 && (elements.nil? || index < elements)
-                raise IndexError, "out of element size (index #{index} for 0 ... #{elements})", caller(2)
-              end
-              index
-            end
-
             eval <<-EOS
-              def bytesize
+              def check_index(index)
+                index = index.to_i
+                unless index >= 0 && (#{elements.nil?} || index < #{elements})
+                  raise IndexError, "out of element size (index \#{index} for 0 ... #{elements})", caller
+                end
+                index
+              end
+
+              def size
                 #{elements}
+              end
+
+              def bytesize
+                #{type.bytesize * elements}
               end
             EOS
           end
 
           define_method(:to_s, -> {
-            buffer__GOGYOU__.byteslice(offset__GOGYOU__, bytesize)
+            buffer__GOGYOU__.byteslice(offset__GOGYOU__, self.bytesize)
           })
 
           define_method(:[], ->(index) {
-            v = type.aref(buffer__GOGYOU__, offset__GOGYOU__ + check_index.(index) * bytesize)
+            v = type.aref(buffer__GOGYOU__, offset__GOGYOU__ + check_index(index) * bytesize)
             v.infect_from(self, buffer) unless v.frozen?
             v.freeze if frozen? || buffer.frozen? || field.const?
             v
@@ -320,7 +327,7 @@ module Gogyou
 
           define_method(:[]=, ->(index, value) {
             raise TypeError, "immutable object (#<%s:0x%08X>)" % [self.class, __id__, index], caller(2) if frozen? or field.const?
-            type.aset(buffer__GOGYOU__, offset__GOGYOU__ + check_index.(index) * bytesize, value)
+            type.aset(buffer__GOGYOU__, offset__GOGYOU__ + check_index(index) * bytesize, value)
           })
         end
         klass

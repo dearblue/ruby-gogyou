@@ -117,15 +117,21 @@ end
 describe Gogyou::Accessor do
   it "fixed bytesize struct" do
     type = Gogyou.struct {
-      int32_t :a, :b, 2, 2
+      char :a, 16
+      int32_t :b
+      int8_t :c
     }
 
-    expect(type.bytesize).to eq 20
+    expect(type.bytesize).to eq 24
     expect(type.bytealign).to eq 4
     expect(type.extensible?).to eq false
 
-    obj = type.new
-    expect(obj.bytesize).to eq 20
+    obj = type.bind((?a .. ?z).to_a.join)
+    expect(obj.bytesize).to eq 24
+    expect(obj.size).to eq 3
+    expect(obj.a.bytesize).to eq 16
+    expect(obj.a[1]).to eq ?b.ord
+    expect(obj.a.to_s).to eq "abcdefghijklmnop"
   end
 
   it "extensibity struct" do

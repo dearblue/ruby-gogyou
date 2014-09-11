@@ -141,7 +141,7 @@
 #
 module Gogyou
   Gogyou = self
-  VERSION = Gem::Version.new("0.2")
+  VERSION = Gem::Version.new("0.2.1")
 
   require_relative "gogyou/typespec"
   require_relative "gogyou/mixin"

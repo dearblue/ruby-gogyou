@@ -7,7 +7,7 @@ module Gogyou
     module Object
       module Mixin
         def infect_from(*obj)
-          obj.each { |o| taint if o.tainted?; untrust if o.untrusted? }
+          obj.each { |o| taint if o.tainted? }
           self
         end
       end
@@ -136,7 +136,6 @@ module Gogyou
 
         def swapbyte(bytesize)
           num = 0
-          mask = 0xff
           bytesize.times do |i|
             num <<= 8
             num |= (self >> (i * 8)) & 0xff
