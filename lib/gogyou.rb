@@ -141,7 +141,7 @@
 #
 module Gogyou
   Gogyou = self
-  VERSION = Gem::Version.new("0.2.1")
+  VERSION = Gem::Version.new("0.2.2")
 
   require_relative "gogyou/typespec"
   require_relative "gogyou/mixin"
@@ -194,6 +194,89 @@ module Gogyou
         nil
       end
     end
+  end
+
+  #
+  # call-seq:
+  #   define_typeinfo(type, bytesize, bytealign, extensible, aref, aset) -> type
+  #
+  # ``type`` に対して、型情報子とするための特異メソッドである ``#bytesize`` ``#bytealign`` ``#extensible?`` ``#aref`` ``#aset`` を定義します。
+  #
+  # ``bytesize`` と ``bytealign`` には整数値、文字列、nil を与えます。
+  #
+  # ``extensible`` には真偽値、文字列、nil を与えます。
+  #
+  # ``aref`` には、引数として ``(buffer, offset)`` を受け取る Proc オブジェクト、文字列、nil を与えます。
+  #
+  # ``aset`` には、引数として ``(buffer, offset, value)`` を受け取る Proc オブジェクト、文字列、nil を与えます。
+  #
+  # これらの引数に文字列を与えた場合、メソッド定義コードとして直接埋め込まれます。
+  #
+  # ``bytesize`` と ``bytealign``、``extensible`` の引数はありません。
+  #
+  # ``aref`` の文字列内部で利用できる引数は ``buffer`` ``offset`` です。
+  #
+  # ``aset`` の文字列内部で利用できる引数は ``buffer`` ``offset`` ``value`` です。
+  #
+  # また nil を与えた場合は、対応するメソッドの定義を省略します。
+  #
+  # 常に ``type`` を返します。
+  #
+  def self.define_typeinfo(type, bytesize, bytealign, extensible, aref, aset)
+    type.instance_eval do
+      unless bytesize.nil?
+        bytesize = bytesize.to_i unless bytesize.kind_of?(String)
+        eval <<-EOM
+          def bytesize
+            #{bytesize}
+          end
+        EOM
+      end
+
+      unless bytealign.nil?
+        bytealign = bytealign.to_i unless bytealign.kind_of?(String)
+        eval <<-EOM
+          def bytealign
+            #{bytealign}
+          end
+        EOM
+      end
+
+      unless extensible.nil?
+        extensible = (!!extensible).inspect unless extensible.kind_of?(String)
+        eval <<-EOM
+          def extensible?
+            #{extensible}
+          end
+        EOM
+      end
+
+      unless aref.nil?
+        if aref.kind_of?(String)
+          eval <<-EOM
+            def aref(buffer, offset)
+              #{aref}
+            end
+          EOM
+        else
+          define_singleton_method(:aref, aref)
+        end
+      end
+
+      unless aset.nil?
+        if aset.kind_of?(String)
+          eval <<-EOM
+            def aset(buffer, offset, value)
+              #{aset}
+            end
+          EOM
+        else
+          define_singleton_method(:aset, aset)
+        end
+      end
+    end
+
+    type
   end
 
   #

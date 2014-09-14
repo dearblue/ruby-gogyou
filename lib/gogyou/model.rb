@@ -66,13 +66,14 @@ module Gogyou
                                :name,   # field name
                                :vector, # 要素数。任意数配列の場合は 0。配列でないならば nil。
                                :type,   # type specification (or model object) of this field
-                               :flags)  # 0x01: const / 0x02: packed (not aligned)
+                               :flags)  # LSB-0+8: packed size exponent (not aligned) / LSB-16: const
       BasicStruct = superclass
 
-      FLAG_CONST  = 0x01
-      FLAG_PACKED = 0x02
+      CONST_BITMASK  = 1 << 16
+      PACKSIZE_BITMASK = 0xff
+      PACKSIZE_NOTDEFINE = 20 # = (1 << 20) = 1 MiB # 事実上の無限
 
-      def initialize(offset, name, vector, type, flags = 0)
+      def initialize(offset, name, vector, type, flags = 0 | PACKSIZE_NOTDEFINE)
         super(offset, name, vector, type, flags)
       end
 
@@ -85,25 +86,30 @@ module Gogyou
       end
 
       def const?
-        ((flags & FLAG_CONST) == FLAG_CONST) ? true : false
+        ((flags & CONST_BITMASK) == CONST_BITMASK) ? true : false
       end
 
       def packed?
-        ((flags & FLAG_PACKED) == FLAG_PACKED) ? true : false
+        ((flags & PACKSIZE_BITMASK) == PACKSIZE_NOTDEFINE) ? false : true
       end
 
-      def mark_const
-        self.flags |= FLAG_CONST
+      def set_const
+        self.flags |= CONST_BITMASK
         self
       end
 
-      def mark_packed
-        self.flags |= FLAGS_PACKED
+      def set_packsize(pack_exponent)
+        pack_exponent = PACKSIZE_NOTDEFINE if pack_exponent > PACKSIZE_NOTDEFINE
+        self.flags = flags.setbit(0, 8, pack_exponent)
         self
+      end
+
+      def packsize
+        1 << flags.getbit(0, 8)
       end
 
       def strflags
-        set = [const? ? "const" : nil, packed? ? "packed" : nil]
+        set = [const? ? "const" : nil, packed? ? "packed(#{packsize})" : nil]
         set.compact!
         return nil if set.empty?
         set.join(",")
@@ -145,12 +151,12 @@ module Gogyou
       end
     end
 
-    def self.struct(typemap, &block)
-      define_container(typemap, Model::Struct, &block)
+    def self.struct(typemap, packexp = Field::PACKSIZE_NOTDEFINE, &block)
+      define_container(typemap, packexp, Model::Struct, &block)
     end
 
-    def self.union(typemap, &block)
-      define_container(typemap, Model::Union, &block)
+    def self.union(typemap, packexp = Field::PACKSIZE_NOTDEFINE, &block)
+      define_container(typemap, packexp, Model::Union, &block)
     end
 
     def self.typedef(typemap, type, aliasname, *elements)
@@ -178,9 +184,9 @@ module Gogyou
       nil
     end
 
-    def self.define_container(typemap, model_type, &block)
+    def self.define_container(typemap, packexp, model_type, &block)
       creator = model_type::Creator.new(typemap, 0, [])
-      proxy = model_type::Creator::Proxy.new(creator)
+      proxy = model_type::Creator::Proxy.new(creator, packexp)
       proxy.instance_exec(&block)
       model = creator.to_model
       model
@@ -205,7 +211,7 @@ module Gogyou
 
     class BasicCreator
       def maxalign(fields = self.fields)
-        fields.map { |f| f.type.bytealign }.max
+        fields.map { |f| f.packed? ? f.packsize : f.type.bytealign }.max
       end
 
       def maxsize(fields = self.fields)
@@ -223,7 +229,7 @@ module Gogyou
           else
             raise "BUG? : field.type is not a Model (%p)" % f.type unless f.type.kind_of?(Model)
             fs = flatten_field(f.type.fields)
-            fs.each { |ff| ff.offset += f.offset; ff.mark_const if f.const? }
+            fs.each { |ff| ff.offset += f.offset; ff.set_const if f.const? }
             fields2.concat fs
           end
         end
@@ -233,23 +239,42 @@ module Gogyou
       # :nodoc: all
       class Proxy < Object
       #class Proxy < BasicObject
-        def initialize(creator)
+        def initialize(creator, packexp = Field::PACKSIZE_NOTDEFINE)
           #singleton_class = (class << proxy; self; end)
           singleton_class.class_eval do
             latest_fields = nil
             #define_method(:method_missing, ->(type, *args) { latest_fields = creator.addfield(type, args); nil })
             creator.typemap.each_key do |t|
-              define_method(t, ->(*args) { latest_fields = creator.addfield(t, args); nil })
+              define_method(t, ->(*args) { latest_fields = creator.addfield(t, packexp, args); nil })
             end
-            define_method(:struct, ->(*args, &block) { latest_fields = creator.struct(args, &block); nil })
-            define_method(:union, ->(*args, &block) { latest_fields = creator.union(args, &block); nil })
+            define_method(:struct, ->(*args, &block) { latest_fields = creator.struct(args, packexp, &block); nil })
+            define_method(:union, ->(*args, &block) { latest_fields = creator.union(args, packexp, &block); nil })
             define_method(:const, ->(dummy_fields) { creator.const(latest_fields); latest_fields = nil; nil })
             define_method(:typedef, ->(*args, &block) { creator.typedef(args, &block) })
+            packexp0 = nil
+            define_method(:packed, ->(bytealign = 1, &block) {
+              raise "wrong nested ``packed''" if packexp0
+              exp = Math.log(bytealign, 2)
+              # exp が Nan Infinity -Infinity の場合は例外が発生するので、それに対する処置も行う
+              unless ((exp = exp.to_i) rescue nil) && (1 << exp) == bytealign
+                raise ArgumentError, "shall be given power of two (but #{bytealign})"
+              end
+
+              begin
+                packexp0 = packexp
+                packexp = exp
+                self.instance_exec(&block)
+              ensure
+                (packexp, packexp0) = packexp0, nil
+              end
+
+              nil
+            })
             if creator.respond_to?(:bytealign)
-              define_method(:bytealign, ->(bytesize, &block) { creator.bytealign(bytesize, &block) })
+              define_method(:bytealign, ->(bytesize, &block) { creator.bytealign(bytesize, &block); nil })
             end
             if creator.respond_to?(:padding)
-              define_method(:padding, ->(bytesize, &block) { creator.padding(bytesize, &block) })
+              define_method(:padding, ->(bytesize, &block) { creator.padding(bytesize, &block); nil })
             end
           end
         end
@@ -287,8 +312,8 @@ module Gogyou
       #     }
       #   }
       #
-      def struct(args, &block)
-        define_container(args, block, Model.method(:struct))
+      def struct(args, packexp, &block)
+        define_container(args, packexp, block, Model.method(:struct))
       end
 
       #
@@ -306,24 +331,24 @@ module Gogyou
       # この記述ができる唯一の理由は、人間が見てわかりやすくすることを意図しています
       # (ただし、ミスリードを誘う手口にも利用されてしまうのが最大の欠点です)。
       #
-      def union(args, &block)
-        define_container(args, block, Model.method(:union))
+      def union(args, packexp, &block)
+        define_container(args, packexp, block, Model.method(:union))
       end
 
-      def define_container(args, anonymblock, container)
+      def define_container(args, packexp, anonymblock, container)
         if anonymblock
           raise ArgumentError, "given block and arguments" unless args.empty?
-          model = container.(typemap.dup, &anonymblock)
+          model = container.(typemap.dup, packexp, &anonymblock)
           raise "BUG - object is not a Model (#{model.class})" unless model.kind_of?(Model)
           #p model: model, superclass: model.superclass
           self.offset = offset.align_ceil(model.bytealign) unless kind_of?(Model::Union::Creator)
-          fields << f = Field[offset, nil, nil, model, 0]
+          fields << f = Field[offset, nil, nil, model, packexp]
           self.offset += model.bytesize unless kind_of?(Model::Union::Creator)
           [f]
         else
           type = args.shift
-          type = container.(typemap.dup, &type) if type.kind_of?(::Proc)
-          addfield!(type, args)
+          type = container.(typemap.dup, packexp, &type) if type.kind_of?(::Proc)
+          addfield!(type, packexp, args)
         end
       end
 
@@ -332,7 +357,7 @@ module Gogyou
       end
 
       def const(fields)
-        fields.each { |f| f.mark_const }
+        fields.each { |f| f.set_const }
       end
 
       #
@@ -371,16 +396,16 @@ module Gogyou
         nil
       end
 
-      def addfield(type, args)
+      def addfield(type, packexp, args)
         typeobj = typemap[type.intern]
         unless typeobj
           raise NoMethodError, "typename or method is missing (#{type})"
         end
 
-        addfield!(typeobj, args)
+        addfield!(typeobj, packexp, args)
       end
 
-      def addfield!(typeobj, args)
+      def addfield!(typeobj, packexp, args)
         #p typeobj
         # check extensible field  >>>  creator.fields[-1].vector[-1]
         if (x = fields[-1]) && (x = x.vector) && x[-1] == 0
@@ -388,13 +413,13 @@ module Gogyou
         end
 
         typesize = typeobj.bytesize
-        typealign = typeobj.bytealign
+        typealign = [typeobj.bytealign, 1 << packexp].min
 
         tmpfields = []
 
         parse!(args) do |name, vect|
           self.offset = offset.align_ceil(typealign) unless kind_of?(Model::Union::Creator)
-          fields << f = Field[offset, name, vect, typeobj, 0]
+          fields << f = Field[offset, name, vect, typeobj, 0 | packexp]
           tmpfields << f
           unless kind_of?(Model::Union::Creator)
             elements = vect ? vect.inject(1, &:*) : 1

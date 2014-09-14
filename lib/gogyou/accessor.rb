@@ -90,7 +90,7 @@ module Gogyou
 
     def inspect
       "#<%s buffer=%p, offset=%p>" % [self.class,
-                                      buffer__GOGYOU__,
+                                      buffer__GOGYOU__.inspect,
                                       offset__GOGYOU__]
     end
 
@@ -337,7 +337,7 @@ module Gogyou
         case value
         when ::String
           raise ArgumentError, "buffer size too small" unless value.bytesize < self::BYTESIZE
-          buffer.setbinary(offset, value, self::BYTESIZE, 0)
+          buffer.setbinary(offset, value, 0, self::BYTESIZE)
         when ::Array
           raise NotImplementedError
         when self::SUBTYPE

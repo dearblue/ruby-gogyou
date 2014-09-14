@@ -231,7 +231,7 @@ module Gogyou
           self
         end
 
-        def setbinary(index, str, bytesize = str.bytesize, offset = 0)
+        def setbinary(index, str, offset = 0, bytesize = str.bytesize)
           offset = offset.to_i
           bytesize = bytesize.to_i
           size1 = str.bytesize - offset

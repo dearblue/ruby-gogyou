@@ -77,7 +77,7 @@ end
 obj = MyRuby::RObject.new
 # or obj = MyRuby::RObject.new(File.read("sample.bin", MyRuby::RObject.size, mode: "rb"))
 obj.basic.flags = 0x12345678
-(obj.basic.klass = 0xaaaaaaaa) rescue $!  # => exception! klass field is immutable type
+(obj.basic.klass = 0xaaaaaaaa) rescue p $!  # => exception! klass field is immutable type
 obj.basic.force_modify.klass = 0xaaaaaaaa
 obj.as.heap.numiv = 0x55555555
 p obj.as.ary[0]  # => 0x55555555
@@ -97,37 +97,73 @@ p obj.to_buffer  # => "xV4\x12\0\0\0\0\xaa\xaa\xaa\xaa\0\0\0\0UUUU\0\0\0\0DDDD\0
 
     C に似た構造体・共用体に対応 (入れ子構造も可能)
 
-        struct {
-          struct {
-            ....
-            union {
-              ....
-              struct {
-                ....
-              }
-            }
-            ....
-          }
-        }
+    ``` ruby:ruby
+    X = Gogyou.struct {
+      int :a
+      float :b
+      double :c
+      union {
+        struct -> {
+          float :x, y, z
+        }, :d
+        const struct -> {
+          int :x, :y, :z
+        }, :e
+      }
+    }
+    ```
 
 *   Support multidimensional arrays
 
     多次元配列に対応
 
-        struct {
-          char :name, 64, 4  # => char name[64][4];
-        }
+    ``` ruby:ruby
+    Gogyou.struct {
+      char :name, 64, 4  # => char name[64][4];
+    }
+    ```
 
 *   Alias types by `typedef` (with array)
 
     `typedef` による型の別名定義 (配列も可能)
 
-        typedef :float, :vector3f, 3  # => C: typedef float vector3f[3];
+    ``` ruby:ruby
+    module MyModule
+      extend Gogyou
 
-        X = struct {      # struct X {
-          vector3f :a     #     vector3f a;
-          vector3f :b, 4  #     vector3f b[4];
-        }                 # };
+      typedef :float, :vector3f, 3  # => C: typedef float vector3f[3];
+
+      X = struct {                  #       struct X {
+        vector3f :a                 #           vector3f a;
+        vector3f :b, 4              #           vector3f b[4];
+      }                             #       };
+    end
+    ```
+
+*   Support packed struct liked GCC ``__attribute__((packed))``
+
+    GCC の ``__attribute__((packed))`` に似た、パックされた構造体に対応
+
+    C 言語での記述
+
+    ``` c:c
+    struct X
+    {
+        char a;
+        int b;
+    } __attribute__((packed));
+    ```
+
+    ruby による記述
+
+    ``` ruby:ruby
+    X = Gogyou.struct {
+      packed {
+        char :a
+        int :b
+      }
+    }
+    ```
 
 *   Appended bit operation for Integer
 
@@ -284,7 +320,7 @@ struct 内の struct の呼び出し方法を示します。union も同様に�
 
 例として、MD5 を定義する場合の型情報は次のようになります。
 
-```ruby:ruby
+``` ruby:ruby
 class MD5
   def self.bytesize
     16
@@ -305,6 +341,18 @@ class MD5
   def self.aset(buffer, offset, data)
     ... snip ...
   end
+end
+```
+
+これらのメソッドを一つ一つ定義する代わりに、任意のクラス・モジュールの中で ``Gogyou.define_typeinfo`` を用いることでまとめて定義することも出来ます。
+
+``` ruby:ruby
+class MD5
+  Gogyou.define_typeinfo(16,    # bytesize
+                         1,     # bytealign
+                         false, # extensible?
+                         ->(buffer, offset) { ... snip ... },       # aref
+                         ->(buffer, offset, data) { ... snip ... }) # aset
 end
 ```
 
@@ -413,6 +461,60 @@ class MD5
 end
 ```
 
+## Define packed struct
+
+GCC の ``__attribute__((packed))`` に似たパックされた構造体のフィールドを定義するには、そのフィールドを ``packed`` メソッドのブロックとして囲うことで行います。
+
+構造体自体をパックするには、その構造体のフィールド全体を ``packed`` することで行います。
+
+また、``packed`` の中に ``struct`` や ``union`` を含めることも出来、その入れ子内部で ``packed`` を行うことも出来ます。
+
+ただし ``packed`` を直接入れ子にして呼び出すことは出来ません。
+
+構造体全体を ``packed`` する場合:
+
+``` ruby:ruby
+X = Gogyou.struct {
+  packed {
+    char :a
+    int :b
+    int :c
+  }
+}
+
+p X.bytesize # => 9
+```
+
+``packed`` された入れ子構造体の内部でさらに ``packed`` する場合:
+
+``` ruby:ruby
+Y = Gogyou.struct {
+  char :a
+  packed {
+    struct {
+      int :b
+    }
+  }
+  char :c, 3
+  int :d
+}
+
+p Y.bytesize # => 12
+```
+
+直接入れ子にして ``packed`` して例外が発生する場合:
+
+``` ruby:ruby
+Z = Gogyou.struct {
+  packed {
+    packed {  ## => EXCEPTION!
+      char :a
+      int :b
+    }
+  }
+}
+```
+
 
 ## Demerit (短所)
 
@@ -423,7 +525,3 @@ end
 *   The cost is high for reference/asignment from/to fields
 
     フィールドに対する参照・代入のコストが高い
-
-*   Can't be definition for packed struct
-
-    パックされた構造体の定義が出来ない (常にフィールドは型によるバイト境界に強制配置される)
