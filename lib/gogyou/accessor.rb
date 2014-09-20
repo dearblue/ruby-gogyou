@@ -89,20 +89,33 @@ module Gogyou
     end
 
     def inspect
-      "#<%s buffer=%p, offset=%p>" % [self.class,
-                                      buffer__GOGYOU__.inspect,
-                                      offset__GOGYOU__]
+      text = "#<#{self.class}"
+      bufsize = buffer__GOGYOU__.bytesize
+      self.class::MODEL.fields.each_with_index do |f, i|
+        if offset__GOGYOU__ + f.offset + f.bytesize > bufsize
+          text << "#{i > 0 ? "," : ""} #{f.name}=N/A"
+        else
+          text << "#{i > 0 ? "," : ""} #{f.name}=#{__send__(f.name).inspect}"
+        end
+      end
+      text << ">"
     end
 
     def pretty_print(q)
-      q.group(1, "#<#{self.class}") do
-        q.breakable " "
-        q.text "buffer="
-        q.pp buffer__GOGYOU__
-        q.text ","
-        q.breakable " "
-        q.text "offset="
-        q.pp offset__GOGYOU__
+      bufsize = buffer__GOGYOU__.bytesize
+      q.group(2, "#<#{self.class}") do
+        self.class::MODEL.fields.each_with_index do |f, i|
+          q.text "," if i > 0
+          q.breakable " "
+          if offset__GOGYOU__ + f.offset + f.bytesize > bufsize
+            q.text "#{f.name}=N/A"
+          else
+            q.group(1, "#{f.name}=") do
+              q.breakable ""
+              q.pp __send__(f.name)
+            end
+          end
+        end
         q.text ">"
       end
     end
@@ -353,6 +366,27 @@ module Gogyou
         return super unless self.class.extensible?
         self.class::BYTESIZE * buffer__GOGYOU__.bytesize.unit_floor(self.class::SUBTYPE)
       end
+
+      def inspect
+        text = "["
+        size.times.with_index do |n, i|
+          text << (i > 0 ? ", " : "") << __send__(:[], n).inspect
+        end
+        text << "]"
+      end
+
+      def pretty_print(q)
+        q.group(1, "[") do
+          size.times.with_index do |n, i|
+            if i > 0
+              q.text ","
+              q.breakable " "
+            end
+            q.pp __send__(:[], n)
+          end
+          q.text "]"
+        end
+      end
     end
 
     module TemporaryMixin
@@ -360,31 +394,33 @@ module Gogyou
 
       def initialize(buffer, offset, model)
         super(buffer, offset)
-        @model__GOGYOU__ = nil
+        @model__GOGYOU__ = model
         self.class.define_accessors(singleton_class, model)
       end
 
       def inspect
-        "#<%s buffer=%p, offset=%p, model=%p>" % [self.class,
-                                                  buffer__GOGYOU__,
-                                                  offset__GOGYOU__,
-                                                  model__GOGYOU__]
+        #text = "#<#{model__GOGYOU__.class}:0x#{model__GOGYOU__.object_id.to_s(16)}"
+        text = "{"
+        model__GOGYOU__.fields.each_with_index do |f, i|
+          text << "#{i > 0 ? ", " : ""}#{f.name}=#{__send__(f.name).inspect}"
+        end
+        text << "}"
       end
 
       def pretty_print(q)
-        q.group(1, "#<#{self.class}") do
-          q.breakable " "
-          q.text "buffer="
-          q.pp buffer__GOGYOU__
-          q.text ","
-          q.breakable " "
-          q.text "offset="
-          q.pp offset__GOGYOU__
-          q.text ","
-          q.breakable " "
-          q.text "model="
-          q.pp model__GOGYOU__ #|| self.class.model
-          q.text ">"
+        #q.group(1, "#<#{model__GOGYOU__.class}:0x#{model__GOGYOU__.object_id.to_s(16)}") do
+        q.group(1, "{") do
+          model__GOGYOU__.fields.each_with_index do |f, i|
+            if i > 0
+              q.text ","
+              q.breakable " "
+            end
+            q.group(1, "#{f.name}=") do
+              q.breakable ""
+              q.pp __send__(f.name)
+            end
+          end
+          q.text "}"
         end
       end
     end

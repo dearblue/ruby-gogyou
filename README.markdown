@@ -348,7 +348,8 @@ end
 
 ``` ruby:ruby
 class MD5
-  Gogyou.define_typeinfo(16,    # bytesize
+  Gogyou.define_typeinfo(self,
+                         16,    # bytesize
                          1,     # bytealign
                          false, # extensible?
                          ->(buffer, offset) { ... snip ... },       # aref

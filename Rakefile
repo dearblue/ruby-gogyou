@@ -1,8 +1,8 @@
 
 require "rake/clean"
 
-DOC = FileList["{README,LICENSE,CHANGELOG,Changelog}{,.ja}{,.txt,.rd,.rdoc,.md,.markdown}"] +
-      FileList["ext/**/{README,LICENSE,CHANGELOG,Changelog}{,.ja}{,.txt,.rd,.rdoc,.md,.markdown}"]
+DOC = FileList["{README,LICENSE,CHANGELOG,Changelog,HISTORY}{,.ja}{,.txt,.rd,.rdoc,.md,.markdown}"] +
+      FileList["ext/**/{README,LICENSE,CHANGELOG,Changelog,HISTORY}{,.ja}{,.txt,.rd,.rdoc,.md,.markdown}"]
 #EXT = FileList["ext/**/*.{h,hh,c,cc,cpp,cxx}"] +
 #      FileList["ext/externals/**/*"]
 EXT = FileList["ext/**/*"]

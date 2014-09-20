@@ -85,6 +85,11 @@ module Gogyou
         end
       end
 
+      def bytesize
+        s = type.bytesize
+        vector ? vector.inject(&:*) * s : s
+      end
+
       def const?
         ((flags & CONST_BITMASK) == CONST_BITMASK) ? true : false
       end
@@ -215,7 +220,7 @@ module Gogyou
       end
 
       def maxsize(fields = self.fields)
-        fields.map { |f| s = f.type.bytesize; f.vector ? f.vector.inject(&:*) * s : s }.max
+        fields.map { |f| f.bytesize }.max
       end
 
       def flatten_field(fields = self.fields)
