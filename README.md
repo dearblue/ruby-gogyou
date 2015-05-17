@@ -18,20 +18,21 @@ ruby 構文による、C 言語の構造体・共用体・多次元配列 (も�
 
 ----
 
-* Product Name (名称): gogyou (ゴギョウ / 御形 / Gnaphalium affine)
-* Author (制作者): dearblue &lt;<dearblue@users.sourceforge.jp>&gt;
-* Distribute License (頒布ライセンス): 2-clause BSD License (二条項 BSD ライセンス)
-* Software Quarity (ソフトウェア品質): alpha
-* User (想定利用者): Rubyist
-* Release Number (リリースナンバー): 0.2
-* Memory Usage (使用メモリ量): 2 MB +
-* Installed Size (インストール容量): under 1 MB
-* Project Page: &lt;http://sourceforge.jp/projects/rutsubo/>
-* Support Ruby: ruby-2.0+ &lt;http://www.ruby-lang.org/>
+  * Product Name (名称): gogyou (ゴギョウ / 御形 / Gnaphalium affine)
+  * Author (制作者): dearblue &lt;dearblue@users.sourceforge.jp&gt;
+  * Distribute License (頒布ライセンス): 2-clause BSD License (二条項 BSD ライセンス)
+  * Software Quarity (ソフトウェア品質): alpha
+  * User (想定利用者): Rubyist
+  * Release Number (リリースナンバー): 0.2.3
+  * Memory Usage (使用メモリ量): 2 MB +
+  * Installed Size (インストール容量): under 1 MB
+  * Project Page: &lt;http://sourceforge.jp/projects/rutsubo/&gt;
+  * Support Ruby: ruby-2.0+ &lt;http://www.ruby-lang.org/&gt;
 
 ## Example
 
-ruby/ruby.h の struct RBasic と struct RObject を gogyou を用いて次のように記述出来ます:
+ruby/ruby.h の ``struct RBasic`` と ``struct RObject`` を gogyou を用いて次のように記述出来ます
+(ポインタの定義はできていないため、``uintptr_t`` で置き換えています):
 
 ```ruby:ruby
 require "gogyou"
@@ -45,12 +46,7 @@ module MyRuby
 
   RBasic = struct {
     VALUE :flags
-    union {
-      const VALUE :klass
-      struct -> {
-        VALUE :klass
-      }, :force_modify
-    }
+    const VALUE :klass
   }
 
   RObject = struct {
@@ -67,63 +63,83 @@ module MyRuby
 end
 ```
 
-`extend Gogyou` して呼ばれた `struct` は、構築した構造体の無名クラスを返します。
+``extend Gogyou`` して呼ばれた ``struct`` は、構築した構造体の無名クラスを返します。
 
 この無名クラスを定数に代入すれば、ruby の一般的なクラスと同様に扱うことが出来ます。
 
-`RObject` のインスタンスは次のように (C 言語のそれや、ruby の他のオブジェクトと相違無く) 扱うことが出来ます。
+``RObject`` のインスタンスは次のように (C 言語のそれや、ruby の他のオブジェクトと相違無く) 扱うことが出来ます。
+
+また、ruby がもつ ``p`` メソッドや ``pp`` メソッドでわかりやすく表示されます (gogyou-0.2.3 にて追加)。
 
 ```ruby:ruby
 obj = MyRuby::RObject.new
-# or obj = MyRuby::RObject.new(File.read("sample.bin", MyRuby::RObject.size, mode: "rb"))
-obj.basic.flags = 0x12345678
-(obj.basic.klass = 0xaaaaaaaa) rescue p $!  # => exception! klass field is immutable type
-obj.basic.force_modify.klass = 0xaaaaaaaa
-obj.as.heap.numiv = 0x55555555
-p obj.as.ary[0]  # => 0x55555555
-tmp = obj.as.heap
-tmp.ivptr = 0x44444444
-p obj.as.ary[1]  # => 0x44444444
+# OR obj = MyRuby::RObject.bind("0123456789abcdef" * 2000)  # given any string
 
-# 以下の結果は 64ビット環境によるものです
-p obj.bytesize  # => 40
-p obj.to_buffer  # => "xV4\x12\0\0\0\0\xaa\xaa\xaa\xaa\0\0\0\0UUUU\0\0\0\0DDDD\0\0\0\0\0\0\0\0\0\0\0\0"
+obj.basic.flags = 1234567890
+(obj.basic.klass = 0xaaaaaaaa) rescue p $!  # => EXCEPTION! klass field is immutable
+
+obj.as.heap.numiv = 0x55555555
+p obj.as.ary[0]  # => 0x55555555  # same address as union field
+
+obj.as.heap.ivptr = 1234567890
+p obj.as.heap.ivptr     # => 1234567890
+tmp = obj.as.heap       # get a middle field accessor
+tmp.ivptr = 0x44444444
+p obj.as.heap.ivptr     # => 0x44444444
+
+# following results are in little endian 64 bit enviroment
+require "pp"
+
+pp obj.bytesize     # => 40
+pp obj.to_buffer    # => "xV4\x12\0\0\0\0\0\0\0\0\0\0\0\0UUUU\0\0\0\0DDDD\0\0\0\0\0\0\0\0\0\0\0\0"
+pp obj              # => #<MyRuby::RObject
+                    #      basic=
+                    #       #<MyRuby::RBasic
+                    #         flags=1234567890,
+                    #         klass=0>,
+                    #      as=
+                    #       {heap={numiv=1431655765, ivptr=1145324612, iv_index_tbl=0},
+                    #        ary=[1431655765, 1145324612, 0]}>
 ```
 
 
 ## About features (機能について)
 
-*   Support A C-liked struct and union (with nested containers)
+  * Support A C-liked struct and union (with nested and anonimous containers)
 
-    C に似た構造体・共用体に対応 (入れ子構造も可能)
+    C に似た構造体・共用体に対応 (無名の入れ子構造も可能)
 
     ``` ruby:ruby
-    X = Gogyou.struct {
-      int :a
-      float :b
-      double :c
-      union {
-        struct -> {
-          float :x, y, z
-        }, :d
-        const struct -> {
-          int :x, :y, :z
-        }, :e
-      }
-    }
+    X = Gogyou.struct {             # struct X {
+      int :a                        #     int a;
+      float :b                      #     float b;
+      double :c                     #     double c;
+      union {                       #     union {
+        struct -> {                 #         struct {
+          float :x, :y, :z, :w      #             float x, y, z, w;
+        }, :d, 4                    #         } d[4];
+        const struct -> {           #         const struct {
+          int32_t :x, :y, :z, :w    #             int x, y, z, w;
+        }, :e, 4                    #         } e[4];
+      }                             #     };
+      struct {                      #     struct {
+        int :u, :v, :s, :t          #         int u, v, s, t;
+      }                             #     };
+    }                               # };
     ```
 
-*   Support multidimensional arrays
+  * Support multidimensional arrays
 
     多次元配列に対応
 
     ``` ruby:ruby
-    Gogyou.struct {
-      char :name, 64, 4  # => char name[64][4];
-    }
+    X = Gogyou.struct {                 # struct X {
+      char :name, 64, 4                 #     char name[64][4];
+      char :a, :b, 16, :c, 4, 8, :d     #     char a, b[16], c[4][8], d; // mixed definition
+    }                                   # };
     ```
 
-*   Alias types by `typedef` (with array)
+  * Alias types by `typedef` (with array)
 
     `typedef` による型の別名定義 (配列も可能)
 
@@ -140,11 +156,11 @@ p obj.to_buffer  # => "xV4\x12\0\0\0\0\xaa\xaa\xaa\xaa\0\0\0\0UUUU\0\0\0\0DDDD\0
     end
     ```
 
-*   Support packed struct liked GCC ``__attribute__((packed))``
+  * Support packed struct liked GCC ``__attribute__((packed))``
 
     GCC の ``__attribute__((packed))`` に似た、パックされた構造体に対応
 
-    C 言語での記述
+    by C:
 
     ``` c:c
     struct X
@@ -154,7 +170,7 @@ p obj.to_buffer  # => "xV4\x12\0\0\0\0\xaa\xaa\xaa\xaa\0\0\0\0UUUU\0\0\0\0DDDD\0
     } __attribute__((packed));
     ```
 
-    ruby による記述
+    by ruby:
 
     ``` ruby:ruby
     X = Gogyou.struct {
@@ -165,11 +181,11 @@ p obj.to_buffer  # => "xV4\x12\0\0\0\0\xaa\xaa\xaa\xaa\0\0\0\0UUUU\0\0\0\0DDDD\0
     }
     ```
 
-*   Appended bit operation for Integer
+  * Appended bit operation for Integer
 
     Integer に対する追加のビット操作
 
-*   Appended binary operation for String
+  * Appended binary operation for String
 
     String に対する追加のバイナリ操作
 
@@ -182,24 +198,68 @@ p obj.to_buffer  # => "xV4\x12\0\0\0\0\xaa\xaa\xaa\xaa\0\0\0\0UUUU\0\0\0\0DDDD\0
 require "gogyou"
 ```
 
-次に、クラスやモジュールの中で `extend Gogyou` します。
+構造体(又は共用体)を定義する方法はいくつかあり、小さいながらもそれぞれに特徴が異なります。
 
-```ruby:ruby
-module MyModule
-  extend Gogyou
-end
-```
+ 1. クラスやモジュールの中で ``extend Gogyou`` して、``struct`` (または ``union``) をブロック付きで呼び出し、その戻り値を定数に代入する
+
+    ```ruby:ruby
+    module MyModule
+      extend Gogyou
+
+      TypeA = struct {
+        int :a
+      }
+    end
+    ```
+
+    特徴:
+
+      * MyModule の中で ``typedef`` を使うことが出来る
+      * extend したモジュール内で struct した型名を typedef することなく利用することが出来る
+
+ 2. Gogyou.struct (または Gogyou.union) をブロック付きで呼び出し、その戻り値を定数に代入する
+
+    ```ruby:ruby
+    TypeA = Gogyou.struct {
+      int :a
+    }
+    ```
+
+    特徴:
+
+      * Gogyou モジュールを ``extend`` する必要がない
+        (``extend`` するためのモジュール/クラスが不要)
+
+ 3. Gogyou::Struct (または Gogyou::Union) を親クラスとしてクラスを定義し、その中で ``struct`` (または ``union``) をブロック付きで呼び出す
+    (gogyou-0.2.3 にて追加)
+
+    ```ruby:ruby
+    class TypeA < Gogyou::Struct
+      struct {
+        int :a
+      }
+    end
+    ```
+
+    特徴:
+
+      * 構造体 (共用体) の定義とメソッド定義を同じ ``class`` ブロックの中で定義することが出来る
+      * Gogyou モジュールを ``extend`` する必要がない
+
+以下の利用例では、(1)の方法を元に説明しています。
 
 ### Define struct (構造体の定義)
 
-構造体(もどき)を構築するには、`struct` をブロック付きで呼び出します。
+クラスやモジュールの中で ``extend Gogyou`` してから ``struct`` をブロック付きで呼び出します。
 
-***このブロックは struct 内部で生成されるオブジェクトが `instance_exec` するときにそのまま渡されます。self が切り替わることに注意して下さい。***
+**このブロックは struct 内部で生成されるオブジェクトが instance\_exec するときにそのまま渡されます。*self が切り替わることに注意*して下さい。**
 
 フィールド名はシンボル (または文字列) で与えます。
 
 ```ruby:ruby
 module MyModule
+  extend Gogyou
+
   TypeA = struct {
     int :a
   }
@@ -217,6 +277,8 @@ end
 
 ```ruby:ruby
 module MyModule
+  extend Gogyou
+
   TypeA1 = struct {
     int :b, 4  #  => C: int b[4];
   }
@@ -227,6 +289,8 @@ end
 
 ```ruby:ruby
 module MyModule
+  extend Gogyou
+
   TypeA2 = struct {
     int :c, 8, 4, 2  #  => C: int c[8][4][2];
   }
@@ -237,6 +301,8 @@ end
 
 ```ruby:ruby
 module MyModule
+  extend Gogyou
+
   TypeA3 = struct {
     int :a, :b, 4, :c, 8, 4, 2  #  => C: int a, b[4], c[8][4][2];
   }
@@ -254,6 +320,8 @@ struct の最初の引数にブロックを与えること以外は、先に述�
 
 ```ruby:ruby
 module MyModule
+  extend Gogyou
+
   TypeB = struct {      #  struct TypeB {
     struct -> {         #      struct {
       int :a, :b        #          int a, b;
@@ -262,10 +330,16 @@ module MyModule
 end
 ```
 
-最初の引数にブロックではなく、型情報を持つオブジェクトを与えることも出来ます。
+最初の引数にブロックではなく、型情報としてのオブジェクトを与えることも出来ます。
 
 ```ruby:ruby
 module MyModule
+  extend Gogyou
+
+  TypeA = struct {
+    int :a
+  }
+
   TypeC = struct {                 #  struct TypeC {
     struct TypeA, :n, 2, 4, 8, :m  #      struct TypeA n[2][4][8], m;
   }                                #  };
@@ -276,6 +350,8 @@ end
 
 ```ruby:ruby
 module MyModule
+  extend Gogyou
+
   TypeD = struct {  #  struct TypeD {
     struct {        #      struct {
       int :a, :b    #          int a, b;
@@ -286,13 +362,13 @@ end
 
 struct 内の struct の呼び出し方法を示します。union も同様に利用できます。
 
-*   `struct { ... } -> nil`
-*   `struct proc_object, field_name, *array_elements`
-*   `struct user_type_info, field_name, *array_elements`
+  * `struct { ... } -> nil`
+  * `struct proc_object, field_name, *array_elements`
+  * `struct user_type_info, field_name, *array_elements`
 
-*   `union { ... } -> nil`
-*   `union proc_object, field_name, *array_elements`
-*   `union user_type_info, field_name, *array_elements`
+  * `union { ... } -> nil`
+  * `union proc_object, field_name, *array_elements`
+  * `union user_type_info, field_name, *array_elements`
 
 引数なしのブロック付きで呼ぶと、無名構造体 (union であれば無名共用体) を定義します。
 
@@ -312,11 +388,11 @@ struct 内の struct の呼び出し方法を示します。union も同様に�
 
 この型情報は次のメソッドを持ったあらゆるオブジェクト (クラスでもモジュールでも、インスタンスでも構いません) のことです。
 
-*   `.bytesize`
-*   `.bytealign`
-*   `.extensible?`
-*   `.aref(buffer, offset)`
-*   `.aset(buffer, offset, data)`
+  * `.bytesize`
+  * `.bytealign`
+  * `.extensible?`
+  * `.aref(buffer, offset)`
+  * `.aset(buffer, offset, data)`
 
 例として、MD5 を定義する場合の型情報は次のようになります。
 
@@ -335,11 +411,11 @@ class MD5
   end
 
   def self.aref(buffer, offset)
-    ... snip ...
+    _ _ _ SNIP _ _ _
   end
 
   def self.aset(buffer, offset, data)
-    ... snip ...
+    _ _ _ SNIP _ _ _
   end
 end
 ```
@@ -348,12 +424,13 @@ end
 
 ``` ruby:ruby
 class MD5
-  Gogyou.define_typeinfo(self,
-                         16,    # bytesize
-                         1,     # bytealign
-                         false, # extensible?
-                         ->(buffer, offset) { ... snip ... },       # aref
-                         ->(buffer, offset, data) { ... snip ... }) # aset
+  Gogyou.define_typeinfo(
+    self,
+    16,    # bytesize
+    1,     # bytealign
+    false, # extensible?
+    ->(buffer, offset) { _ _ _ SNIP _ _ _ },       # aref
+    ->(buffer, offset, data) { _ _ _ SNIP _ _ _ }) # aset
 end
 ```
 
@@ -371,7 +448,8 @@ MD5 を定義する場合、16バイトなので `16` を返します。
 
 このメソッドはその型のアライメントサイズを正の整数値で返します。
 
-MD5 を定義する場合、内部表現は1バイトの塊なので `1` を返します (MD5 の実装によっては `4` だったり `8` だったり、はたまた `16` になるかもしれません)。
+MD5 を定義する場合、内部表現は1バイトの塊なので `1` を返します
+(MD5 の実装によっては `4` だったり `8` だったり、はたまた `16` になるかもしれません)。
 
 ### `.extensible?`
 
@@ -519,10 +597,7 @@ Z = Gogyou.struct {
 
 ## Demerit (短所)
 
-*   Can't be handled pointer
-
-    ポインタが扱えない
-
-*   The cost is high for reference/asignment from/to fields
-
-    フィールドに対する参照・代入のコストが高い
+  * Can't be handled pointer
+    (ポインタが扱えない)
+  * The cost is high for reference/asignment from/to fields
+    (フィールドに対する参照・代入のコストが高い)

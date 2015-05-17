@@ -12,12 +12,8 @@ int8_t    1 1 store8    loadi8
 uint8_t   1 1 store8    loadu8
 int16_t   2 2 store16   loadi16
 uint16_t  2 2 store16   loadu16
-int24_t   3 1 store24   loadi24
-uint24_t  3 1 store24   loadu24
 int32_t   4 4 store32   loadi32
 uint32_t  4 4 store32   loadu32
-int48_t   6 2 store48   loadi48
-uint48_t  6 2 store48   loadu48
 int64_t   8 8 store64   loadi64
 uint64_t  8 8 store64   loadu64
 int16_be  2 2 store16be loadi16be
@@ -42,12 +38,8 @@ int64_le  8 8 store64le loadi64le
 uint64_le 8 8 store64le loadu64le
 int16_swap  2 2 store16swap loadi16swap
 uint16_swap 2 2 store16swap loadu16swap
-int24_swap  3 1 store24swap loadi24swap
-uint24_swap 3 1 store24swap loadu24swap
 int32_swap  4 4 store32swap loadi32swap
 uint32_swap 4 4 store32swap loadu32swap
-int48_swap  6 2 store48swap loadi48swap
-uint48_swap 6 2 store48swap loadu48swap
 int64_swap  8 8 store64swap loadi64swap
 uint64_swap 8 8 store64swap loadu64swap
 char      1 1 store8   loadi8
@@ -96,26 +88,23 @@ module Gogyou
       end
 
       def to_s
-        "\#{self.class}[name=\#{name.inspect}, bytesize=\#{bytesize.inspect}, bytealign=\#{bytealign.inspect}]"
+        "\\\#<\#{self.class}:\#{name} bytesize=\#{bytesize.inspect}, bytealign=\#{bytealign.inspect}>"
       end
 
       alias inspect to_s
 
       def pretty_print(q)
         #name, bytesize, bytealign
-        q.group(1, "\#{self.class}[") do
-          q.text "name="
-          q.pp name
-          q.text ", "
-          #q.breakable
+        q.group(1, "\\\#<\#{self.class}:\#{name}") do
+          q.breakable " "
           q.text "bytesize="
           q.pp bytesize
-          q.text ", "
-          #q.breakable
+          q.text ","
+          q.breakable " "
           q.text "bytealign="
           q.pp bytealign
         end
-        q.text "]"
+        q.text ">"
       end
     end
 
@@ -123,45 +112,13 @@ module Gogyou
 
   records = records.split(/\n/)
   records.map! { |r| r.split(/\s+/) }
-  
+
   records.each do |typename, bytesize, bytealign, aset, aref|
     name = typename.upcase
     f.puts <<-EOS
     #{name.ljust(9)} = Primitive[#{typename.intern.inspect}, #{bytesize}, #{bytealign},
                           ->(buf, offset, num) { buf.#{aset}(offset, num) },
                           ->(buf, offset) { buf.#{aref}(offset) }].freeze
-    EOS
-  end
-
-  f.puts <<-EOS
-  end
-
-  class Model
-    TYPEMAP = {
-  EOS
-
-  records.each do |typename, bytesize, bytealign, aset, aref|
-    sym = typename.to_sym.inspect
-    f.puts <<-EOS % ["#{typename}:".ljust(17, " "), typename.upcase]
-      %s Primitives::%s,
-    EOS
-  end
-
-  f.puts <<-EOS
-    }
-
-  EOS
-
-  [
-    %w(unsigned_char uchar),
-    %w(unsigned_short ushort),
-    %w(unsigned_int uint),
-    %w(unsigned_long ulong),
-    %w(unsigned_long_long ulonglong),
-    %w(long_long longlong),
-  ].each do |link, name|
-    f.puts <<-EOS
-    TYPEMAP[:#{link}] = TYPEMAP[:#{name}]
     EOS
   end
 

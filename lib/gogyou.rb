@@ -24,47 +24,42 @@
 #
 # 原始的な型情報は Gogyou::Primitives で定義してあり、struct や union メソッド内で利用できる型を次の表に示します:
 #
-#                               符号あり    符号なし
-#                               ----        ----
-#   8ビット整数型               char        uchar
-#                                           unsigned_char
-#   16ビット整数型              short       ushort
-#                                           unsigned_short
-#   32ビット整数型              int         uint
-#                                           unsigned_int
-#   環境依存32/64ビット整数型   long        ulong
-#                                           unsigned_long
-#   64ビット整数型              longlong    ulonglong
-#                               long_long   unsigned_long_long
-#   32ビット浮動少数型          float
-#   64ビット浮動少数型          double
-#   sizeof 表現型               ssize_t     size_t
-#   ポインタ整数型              intptr_t    uintptr_t
+# ==== C 標準型
+#                           符号あり    符号なし
+#                           ----        ----
+#   char 型                 char        uchar
+#                                       unsigned_char
+#   short 型                short       ushort
+#                                       unsigned_short
+#   int 型                  int         uint
+#                                       unsigned_int
+#   long 型                 long        ulong
+#                                       unsigned_long
+#   long long 型            longlong    ulonglong
+#                           long_long   unsigned_long_long
+#   sizeof 型               ssize_t     size_t
+#   ポインタ整数型          intptr_t    uintptr_t
 #
-#     *** ビット数環境非依存 ***
+#                           バイトオーダー環境依存  バイトオーダー反転
+#                           符号あり  符号なし      符号あり    符号なし
+#                           ----      ----          ----        ----
+#   8ビット整数型           int8_t    uint8_t       N/A         N/A
+#   16ビット整数型          int16_t   uint16_t      int16_swap  uint16_swap
+#   32ビット整数型          int32_t   uint32_t      int32_swap  uint32_swap
+#   64ビット整数型          int64_t   uint64_t      int64_swap  uint64_swap
+#   32ビット浮動小数点数型  float     N/A           float_swap  N/A
+#   64ビット浮動小数点数型  double    N/A           double_swap N/A
 #
-#                   バイトオーダー環境依存  バイトオーダー反転
-#                   符号あり  符号なし      符号あり    符号なし
-#                   ----      ----          ----        ----
-#   8ビット整数型   int8_t    uint8_t       //          //
-#   16ビット整数型  int16_t   uint16_t      int16_swap  uint16_swap
-#   24ビット整数型  int24_t   uint24_t      int24_swap  uint24_swap
-#   32ビット整数型  int32_t   uint32_t      int32_swap  uint32_swap
-#   48ビット整数型  int48_t   uint48_t      int48_swap  uint48_swap
-#   64ビット整数型  int64_t   uint64_t      int64_swap  uint64_swap
-#
-#                   ビッグエンディアン    リトルエンディアン
-#                   符号あり  符号なし    符号あり  符号なし
-#                   ----      ----        ----      ----
-#   16ビット整数型  int16_be  uint16_be   int16_le  uint16_le
-#   24ビット整数型  int24_be  uint24_be   int24_le  uint24_le
-#   32ビット整数型  int32_be  uint32_be   int32_le  uint32_le
-#   48ビット整数型  int48_be  uint48_be   int48_le  uint48_le
-#   64ビット整数型  int64_be  uint64_be   int64_le  uint64_le
-#
-#                       ビッグエンディアン  リトルエンディアン  バイトオーダー反転
-#   32ビット浮動少数型  float_be            float_le            float_swap
-#   64ビット浮動少数型  double_be           double_le           double_swap
+#                           ビッグエンディアン    リトルエンディアン
+#                           符号あり  符号なし    符号あり  符号なし
+#                           ----      ----        ----      ----
+#   16ビット整数型          int16_be  uint16_be   int16_le  uint16_le
+#   24ビット整数型          int24_be  uint24_be   int24_le  uint24_le
+#   32ビット整数型          int32_be  uint32_be   int32_le  uint32_le
+#   48ビット整数型          int48_be  uint48_be   int48_le  uint48_le
+#   64ビット整数型          int64_be  uint64_be   int64_le  uint64_le
+#   32ビット浮動小数点数型  float_be  N/A         float_le  N/A
+#   64ビット浮動小数点数型  double_be N/A         double_le N/A
 #
 #
 # ==== 利用者定義の型情報
@@ -141,13 +136,66 @@
 #
 module Gogyou
   Gogyou = self
-  VERSION = Gem::Version.new("0.2.3")
 
+  require_relative "gogyou/version"
   require_relative "gogyou/typespec"
   require_relative "gogyou/mixin"
   require_relative "gogyou/model"
   require_relative "gogyou/primitives"
   require_relative "gogyou/accessor"
+
+  class Model
+    TYPEMAP = {}
+
+    Gogyou::Primitives.constants.each do |n|
+      prim = Gogyou::Primitives.const_get(n)
+      next unless prim.kind_of?(Gogyou::Primitives::Primitive)
+      TYPEMAP[prim.name.to_sym] = prim
+    end
+
+    TYPEMAP[:unsigned_char] = TYPEMAP[:uchar]
+    TYPEMAP[:unsigned_short] = TYPEMAP[:ushort]
+    TYPEMAP[:unsigned_int] = TYPEMAP[:uint]
+    TYPEMAP[:unsigned_long] = TYPEMAP[:ulong]
+    TYPEMAP[:unsigned_long_long] = TYPEMAP[:ulonglong]
+    TYPEMAP[:long_long] = TYPEMAP[:longlong]
+  end
+
+  class Struct < Accessor::Struct
+    def self.struct(&block)
+      raise TypeError, "already defined struct" if const_defined?(:MODEL)
+
+      # TODO: Accessor.define からコピペ。統一するべき。
+      model = Model.struct(Model::TYPEMAP.dup, &block)
+      const_set(:MODEL, model)
+      const_set(:BYTESIZE, model.bytesize)
+      const_set(:BYTEALIGN, model.bytealign)
+      const_set(:EXTENSIBLE, model.extensible?)
+      define_accessors(self, model)
+
+      nil
+    end
+
+    private_class_method :struct
+  end
+
+  class Union < Accessor::Union
+    def self.union(&block)
+      raise TypeError, "already defined union" if const_defined?(:MODEL)
+
+      # TODO: Accessor.define からコピペ。統一するべき。
+      model = Model.union(Model::TYPEMAP.dup, &block)
+      const_set(:MODEL, model)
+      const_set(:BYTESIZE, model.bytesize)
+      const_set(:BYTEALIGN, model.bytealign)
+      const_set(:EXTENSIBLE, model.extensible?)
+      define_accessors(self, model)
+
+      nil
+    end
+
+    private_class_method :union
+  end
 
   #
   # call-seq:

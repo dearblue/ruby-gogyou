@@ -13,14 +13,24 @@ module Gogyou
 
     undef :bytesize=, :bytealign=, :fields=
 
-    def initialize(*args)
-      case
-      when args.size < 3
-        raise ArgumentError, "wrong argument size (#{args.size} for 3+)"
-      when args.size < 4 && args[2].kind_of?(::Array)
+    #
+    # call-seq:
+    #   initialize(bytesize, bytealign, fields, ...)
+    #
+    # [bytesize]
+    #   This is total model size in bytes.
+    #
+    # [bytealign]
+    #   This is model alignment size in bytes.
+    #
+    # [fields ...]
+    #   These are one or more field instance.
+    #
+    def initialize(bytesize, bytealign, field1, *fields)
+      if fields.empty? && field1.kind_of?(::Array)
         super
       else
-        super(args[0], args[1], args.slice(2 .. -1))
+        super bytesize.to_i, bytealign.to_i, [field1, *fields]
       end
     end
 
@@ -241,59 +251,15 @@ module Gogyou
         fields2
       end
 
-      # :nodoc: all
-      class Proxy < Object
-      #class Proxy < BasicObject
-        def initialize(creator, packexp = Field::PACKSIZE_NOTDEFINE)
-          #singleton_class = (class << proxy; self; end)
-          singleton_class.class_eval do
-            latest_fields = nil
-            #define_method(:method_missing, ->(type, *args) { latest_fields = creator.addfield(type, args); nil })
-            creator.typemap.each_key do |t|
-              define_method(t, ->(*args) { latest_fields = creator.addfield(t, packexp, args); nil })
-            end
-            define_method(:struct, ->(*args, &block) { latest_fields = creator.struct(args, packexp, &block); nil })
-            define_method(:union, ->(*args, &block) { latest_fields = creator.union(args, packexp, &block); nil })
-            define_method(:const, ->(dummy_fields) { creator.const(latest_fields); latest_fields = nil; nil })
-            define_method(:typedef, ->(*args, &block) { creator.typedef(args, &block) })
-            packexp0 = nil
-            define_method(:packed, ->(bytealign = 1, &block) {
-              raise "wrong nested ``packed''" if packexp0
-              exp = Math.log(bytealign, 2)
-              # exp が Nan Infinity -Infinity の場合は例外が発生するので、それに対する処置も行う
-              unless ((exp = exp.to_i) rescue nil) && (1 << exp) == bytealign
-                raise ArgumentError, "shall be given power of two (but #{bytealign})"
-              end
-
-              begin
-                packexp0 = packexp
-                packexp = exp
-                self.instance_exec(&block)
-              ensure
-                (packexp, packexp0) = packexp0, nil
-              end
-
-              nil
-            })
-            if creator.respond_to?(:bytealign)
-              define_method(:bytealign, ->(bytesize, &block) { creator.bytealign(bytesize, &block); nil })
-            end
-            if creator.respond_to?(:padding)
-              define_method(:padding, ->(bytesize, &block) { creator.padding(bytesize, &block); nil })
-            end
-          end
-        end
-      end
-
       #
       # call-seq:
       #   struct type, name, *vector
       #   struct proc, name, *vector
       #   struct { ... }
       #
-      # 最初の呼び出し方法は、既存の (typedef していない) 型情報を用いる、または構造体をその場で定義するために利用できます。
+      # 最初と二番目の呼び出し方法は、既存の (typedef していない) 型情報を用いる、または構造体をその場で定義するために利用できます。
       #
-      # 二番目の呼び出し方法は、無名構造体を定義するために利用できます。
+      # 三番目の呼び出し方法は、無名構造体を定義するために利用できます。
       #
       # === example (型情報を用いる)
       #
@@ -366,6 +332,28 @@ module Gogyou
       end
 
       #
+      # call-seq:
+      #   packed { ... } -> nil
+      #   packed(bytealign) { ... } -> nil
+      #
+      # ブロック内部のフィールドのバイトアライメントを調節します。
+      #
+      # packed を直接の入れ子にして呼び出すことは出来ません。struct や union を挟んで呼び出すことは出来ます。
+      #
+      # 引数無しで呼び出した場合は、bytealign に 1 を与えて呼び出すものと同義となります。
+      #
+      # [bytealign]
+      #   1 以上で2の冪乗となる整数値を指定します。
+      #
+      #   nil を与えた場合、上位階層で指定したパックサイズを無効化して本来のバイトアライメントに配置するようにします。
+      #
+      def packed(bytealign = 1)
+        raise "This method is defined for documentaion. Real implemented is in Gogyou::Model::BasicCreator::Proxy#initialize"
+        yield
+        nil
+      end
+
+      #
       # フィールド名の解析
       #
       def parse!(args)
@@ -433,6 +421,53 @@ module Gogyou
         end
 
         tmpfields
+      end
+
+      class Proxy < Object # :nodoc: all
+      #class Proxy < BasicObject
+        def initialize(creator, packexp = Field::PACKSIZE_NOTDEFINE)
+          #singleton_class = (class << proxy; self; end)
+          singleton_class.class_eval do
+            latest_fields = nil
+            #define_method(:method_missing, ->(type, *args) { latest_fields = creator.addfield(type, args); nil })
+            creator.typemap.each_key do |t|
+              define_method(t, ->(*args) { latest_fields = creator.addfield(t, packexp, args); nil })
+            end
+            define_method(:struct, ->(*args, &block) { latest_fields = creator.struct(args, packexp, &block); nil })
+            define_method(:union, ->(*args, &block) { latest_fields = creator.union(args, packexp, &block); nil })
+            define_method(:const, ->(dummy_fields) { creator.const(latest_fields); latest_fields = nil; nil })
+            define_method(:typedef, ->(*args, &block) { creator.typedef(args, &block) })
+            packexp0 = nil
+            define_method(:packed, ->(bytealign = 1, &block) {
+              raise "wrong nested ``packed''" if packexp0
+              if bytealign.nil?
+                exp = Field::PACKSIZE_NOTDEFINE
+              else
+                exp = Math.log(bytealign, 2)
+                # exp が Nan Infinity -Infinity の場合は例外が発生するので、それに対する処置も行う
+                unless ((exp = exp.to_i) rescue nil) && (1 << exp) == bytealign
+                  raise ArgumentError, "shall be given power of two (but #{bytealign})"
+                end
+              end
+
+              begin
+                packexp0 = packexp
+                packexp = exp
+                self.instance_exec(&block)
+              ensure
+                (packexp, packexp0) = packexp0, nil
+              end
+
+              nil
+            })
+            if creator.respond_to?(:bytealign)
+              define_method(:bytealign, ->(bytesize, &block) { creator.bytealign(bytesize, &block); nil })
+            end
+            if creator.respond_to?(:padding)
+              define_method(:padding, ->(bytesize, &block) { creator.padding(bytesize, &block); nil })
+            end
+          end
+        end
       end
     end
 

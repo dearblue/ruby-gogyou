@@ -43,15 +43,15 @@ module Gogyou
     # バイナリデータとして取り出します。
     #
     def to_s
-      buffer__GOGYOU__.byteslice(offset__GOGYOU__, self.class::BYTESIZE)
+      @buffer__GOGYOU__.byteslice(@offset__GOGYOU__, self.class::BYTESIZE)
     end
 
     def to_buffer
-      buffer__GOGYOU__
+      @buffer__GOGYOU__
     end
 
     def to_ptr
-      buffer__GOGYOU__.to_ptr
+      @buffer__GOGYOU__.to_ptr
     end
 
     #
@@ -61,8 +61,9 @@ module Gogyou
     #
     # 自身のデータ領域を指定バイト数ずらした参照体を返します。
     #
-    def slide(bytesize = self.class::BYTESIZE)
-      self.class.new(buffer__GOGYOU__, offset__GOGYOU__ + bytesize)
+    def slide(bytesize = 0)
+      offset = @offset__GOGYOU__ + self.class::BYTESIZE + bytesize
+      self.class.new(@buffer__GOGYOU__, offset)
     end
 
     #
@@ -72,10 +73,8 @@ module Gogyou
     #
     # 詳細は slide を参照して下さい。
     #
-    def slide!(bytesize = self.class::BYTESIZE)
-      offset = offset__GOGYOU__ + bytesize
-      #return nil if offset < 0
-      #return nil if offset + buffer__GOGYOU__.bytesize > layout__GOGYOU__.bytesize
+    def slide!(bytesize = 0)
+      offset = @offset__GOGYOU__ + self.class::BYTESIZE + bytesize
       @offset__GOGYOU__ = offset
       self
     end
@@ -84,15 +83,33 @@ module Gogyou
       self.class::BYTESIZE
     end
 
-    def size
+    def elementsize
       nil
+    end
+
+    def size
+      elementsize
+    end
+
+    #
+    # call-seq:
+    #   validate? -> true or false
+    #
+    # validation for buffer window.
+    #
+    def validate?
+      if @offset__GOGYOU__ + bytesize > @buffer__GOGYOU__.bytesize
+        false
+      else
+        true
+      end
     end
 
     def inspect
       text = "#<#{self.class}"
-      bufsize = buffer__GOGYOU__.bytesize
+      bufsize = @buffer__GOGYOU__.bytesize
       self.class::MODEL.fields.each_with_index do |f, i|
-        if offset__GOGYOU__ + f.offset + f.bytesize > bufsize
+        if @offset__GOGYOU__ + f.offset + f.bytesize > bufsize
           text << "#{i > 0 ? "," : ""} #{f.name}=N/A"
         else
           text << "#{i > 0 ? "," : ""} #{f.name}=#{__send__(f.name).inspect}"
@@ -102,12 +119,12 @@ module Gogyou
     end
 
     def pretty_print(q)
-      bufsize = buffer__GOGYOU__.bytesize
+      bufsize = @buffer__GOGYOU__.bytesize
       q.group(2, "#<#{self.class}") do
         self.class::MODEL.fields.each_with_index do |f, i|
           q.text "," if i > 0
           q.breakable " "
-          if offset__GOGYOU__ + f.offset + f.bytesize > bufsize
+          if @offset__GOGYOU__ + f.offset + f.bytesize > bufsize
             q.text "#{f.name}=N/A"
           else
             q.group(1, "#{f.name}=") do
@@ -163,10 +180,10 @@ module Gogyou
         namecheck = {}
         fieldsize = model.fields.size
         define_method(:size__GOGYOU__, -> { fieldsize })
+        alias_method(:elementsize, :size__GOGYOU__)
         alias_method(:size, :size__GOGYOU__)
         model.fields.each do |field|
           name = field.name
-          #raise NameError, "wrong field name - #{name}" unless name =~ /\A[A-Za-z_][A-Za-z_0-9]*\Z/
           name = name.intern
           raise NameError, "already exist field name - #{name}" if namecheck[name]
           namecheck[name] = true
@@ -180,7 +197,7 @@ module Gogyou
           end
 
           define_method(field.name, -> {
-            v = type.aref(buffer__GOGYOU__, offset__GOGYOU__ + field.offset)
+            v = type.aref(@buffer__GOGYOU__, @offset__GOGYOU__ + field.offset)
             v.infect_from(self, buffer) unless v.frozen?
             v.freeze if frozen? || buffer.frozen? || field.const?
             v
@@ -189,7 +206,7 @@ module Gogyou
           define_method("#{field.name}=", ->(value) {
             raise TypeError, "immutable object (#<%s:0x%08X>.%s)" % [self.class, __id__, field.name], caller(2) if frozen?
             raise TypeError, "immutable field (#<%s:0x%08X>.%s)" % [self.class, __id__, field.name], caller(2) if field.const?
-            type.aset(buffer__GOGYOU__, offset__GOGYOU__ + field.offset, value)
+            type.aset(@buffer__GOGYOU__, @offset__GOGYOU__ + field.offset, value)
           })
         end
       end
@@ -285,27 +302,29 @@ module Gogyou
           if model.bytesize == 0
             define_method(:check_index, ->(index) {
               index = index.to_i
-              unless index >= 0 && index < self.size
-                raise IndexError, "out of element size (index #{index} for 0 ... #{self.size})", caller(2)
+              unless index >= 0 && index < self.elementsize
+                raise IndexError, "out of element size (index #{index} for 0 ... #{self.elementsize})", caller(2)
               end
               index
             })
 
             define_method(:<<, ->(value) {
               raise TypeError, "immutable object (#<%s:0x%08X>)" % [self.class, __id__], caller(2) if frozen?
-              voff = (buffer__GOGYOU__.bytesize - offset__GOGYOU__).align_floor(type.bytesize)
-              expandsize = offset__GOGYOU__ + voff + type.bytesize
-              buffer__GOGYOU__.resize(expandsize)
-              type.aset(buffer__GOGYOU__, offset__GOGYOU__ + voff, value)
+              voff = (@buffer__GOGYOU__.bytesize - @offset__GOGYOU__).align_floor(type.bytesize)
+              expandsize = @offset__GOGYOU__ + voff + type.bytesize
+              @buffer__GOGYOU__.resize(expandsize)
+              type.aset(@buffer__GOGYOU__, @offset__GOGYOU__ + voff, value)
               self
             })
 
-            define_method(:size, -> {
-              (buffer__GOGYOU__.bytesize - offset__GOGYOU__).unit_floor(type.bytesize)
+            define_method(:elementsize, -> {
+              (@buffer__GOGYOU__.bytesize - @offset__GOGYOU__).unit_floor(type.bytesize)
             })
 
+            alias_method(:size, :elementsize)
+
             define_method(:bytesize, -> {
-              (buffer__GOGYOU__.bytesize - offset__GOGYOU__).align_floor(type.bytesize)
+              (@buffer__GOGYOU__.bytesize - @offset__GOGYOU__).align_floor(type.bytesize)
             })
           else
             eval <<-EOS
@@ -317,9 +336,11 @@ module Gogyou
                 index
               end
 
-              def size
+              def elementsize
                 #{elements}
               end
+
+              alias size elementsize
 
               def bytesize
                 #{type.bytesize * elements}
@@ -328,19 +349,19 @@ module Gogyou
           end
 
           define_method(:to_s, -> {
-            buffer__GOGYOU__.byteslice(offset__GOGYOU__, self.bytesize)
+            @buffer__GOGYOU__.byteslice(@offset__GOGYOU__, self.bytesize)
           })
 
           define_method(:[], ->(index) {
-            v = type.aref(buffer__GOGYOU__, offset__GOGYOU__ + check_index(index) * bytesize)
+            v = type.aref(@buffer__GOGYOU__, @offset__GOGYOU__ + check_index(index) * bytesize)
             v.infect_from(self, buffer) unless v.frozen?
             v.freeze if frozen? || buffer.frozen? || field.const?
             v
           })
 
           define_method(:[]=, ->(index, value) {
-            raise TypeError, "immutable object (#<%s:0x%08X>)" % [self.class, __id__, index], caller(2) if frozen? or field.const?
-            type.aset(buffer__GOGYOU__, offset__GOGYOU__ + check_index(index) * bytesize, value)
+            raise TypeError, "immutable object (#<%s:0x%08X>)" % [self.class, __id__, index], caller(2) if frozen? || field.const?
+            type.aset(@buffer__GOGYOU__, @offset__GOGYOU__ + check_index(index) * bytesize, value)
           })
         end
         klass
@@ -349,7 +370,7 @@ module Gogyou
       def self.aset(buffer, offset, value)
         case value
         when ::String
-          raise ArgumentError, "buffer size too small" unless value.bytesize < self::BYTESIZE
+          raise ArgumentError, "buffer size too small" unless value.bytesize <= self::BYTESIZE
           buffer.setbinary(offset, value, 0, self::BYTESIZE)
         when ::Array
           raise NotImplementedError
@@ -364,12 +385,12 @@ module Gogyou
 
       def bytesize
         return super unless self.class.extensible?
-        self.class::BYTESIZE * buffer__GOGYOU__.bytesize.unit_floor(self.class::SUBTYPE)
+        self.class::BYTESIZE * @buffer__GOGYOU__.bytesize.unit_floor(self.class::SUBTYPE)
       end
 
       def inspect
         text = "["
-        size.times.with_index do |n, i|
+        elementsize.times.with_index do |n, i|
           text << (i > 0 ? ", " : "") << __send__(:[], n).inspect
         end
         text << "]"
@@ -377,7 +398,7 @@ module Gogyou
 
       def pretty_print(q)
         q.group(1, "[") do
-          size.times.with_index do |n, i|
+          elementsize.times.with_index do |n, i|
             if i > 0
               q.text ","
               q.breakable " "
@@ -399,7 +420,6 @@ module Gogyou
       end
 
       def inspect
-        #text = "#<#{model__GOGYOU__.class}:0x#{model__GOGYOU__.object_id.to_s(16)}"
         text = "{"
         model__GOGYOU__.fields.each_with_index do |f, i|
           text << "#{i > 0 ? ", " : ""}#{f.name}=#{__send__(f.name).inspect}"
@@ -408,7 +428,6 @@ module Gogyou
       end
 
       def pretty_print(q)
-        #q.group(1, "#<#{model__GOGYOU__.class}:0x#{model__GOGYOU__.object_id.to_s(16)}") do
         q.group(1, "{") do
           model__GOGYOU__.fields.each_with_index do |f, i|
             if i > 0

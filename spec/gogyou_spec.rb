@@ -86,7 +86,9 @@ describe Gogyou::Model do
       Gogyou::Model::Field[8, :e, [4], Gogyou::Model::Struct[
         16, 8,
         Gogyou::Model::Field[0, :c, nil, Gogyou::Primitives::INT64_T],
-        Gogyou::Model::Field[8, :d, nil, Gogyou::Primitives::INT32_T]]]]
+        Gogyou::Model::Field[8, :d, nil, Gogyou::Primitives::INT32_T]
+      ]]
+    ]
     expect(x::MODEL).to eq ref
   end
 
@@ -109,7 +111,8 @@ describe Gogyou::Model do
     ref = Gogyou::Model::Union[
       24, 8,
       Gogyou::Model::Field[0, :a, nil, x],
-      Gogyou::Model::Field[0, :b, nil, x]]
+      Gogyou::Model::Field[0, :b, nil, x]
+    ]
     expect(y::MODEL).to eq ref
   end
 end
@@ -251,6 +254,7 @@ describe Gogyou::Accessor do
     expect(type1.extensible?).to eq false
     expect(type1.new.bytesize).to eq 6
 
+    # error: directly under packed in packed
     expect {
       Gogyou.struct {
         packed(1) {

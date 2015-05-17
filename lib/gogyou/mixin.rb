@@ -320,15 +320,15 @@ module Gogyou
         end
 
         def loadu8(index)
-          getbyte(index.to_i)
+          getbyte(index)
         end
 
         def loadi8(index)
-          loadu8(index).extendsign(8)
+          getbyte(index).extendsign(8)
         end
 
         def loadu16be(index)
-          (loadu8(index) << 8) | loadu8(index + 1)
+          (getbyte(index) << 8) | getbyte(index + 1)
         end
 
         def loadi16be(index)
@@ -336,7 +336,7 @@ module Gogyou
         end
 
         def loadu16le(index)
-          loadu8(index) | (loadu8(index + 1) << 8)
+          getbyte(index) | (getbyte(index + 1) << 8)
         end
 
         def loadi16le(index)
@@ -344,7 +344,7 @@ module Gogyou
         end
 
         def loadu24be(index)
-          (loadu8(index) << 16) | (loadu8(index + 1) << 8) | loadu8(index + 2)
+          (getbyte(index) << 16) | (getbyte(index + 1) << 8) | getbyte(index + 2)
         end
 
         def loadi24be(index)
@@ -352,7 +352,7 @@ module Gogyou
         end
 
         def loadu24le(index)
-          loadu8(index) | (loadu8(index + 1) << 8) | (loadu8(index + 2) << 16)
+          getbyte(index) | (getbyte(index + 1) << 8) | (getbyte(index + 2) << 16)
         end
 
         def loadi24le(index)
@@ -360,7 +360,7 @@ module Gogyou
         end
 
         def loadu32be(index)
-          (loadu8(index) << 24) | (loadu8(index + 1) << 16) | (loadu8(index + 2) << 8) | loadu8(index + 3)
+          (getbyte(index) << 24) | (getbyte(index + 1) << 16) | (getbyte(index + 2) << 8) | getbyte(index + 3)
         end
 
         def loadi32be(index)
@@ -368,7 +368,7 @@ module Gogyou
         end
 
         def loadu32le(index)
-          loadu8(index) | (loadu8(index + 1) << 8) | (loadu8(index + 2) << 16) | (loadu8(index + 3) << 24)
+          getbyte(index) | (getbyte(index + 1) << 8) | (getbyte(index + 2) << 16) | (getbyte(index + 3) << 24)
         end
 
         def loadi32le(index)
