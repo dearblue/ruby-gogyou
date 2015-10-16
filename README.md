@@ -19,14 +19,14 @@ ruby 構文による、C 言語の構造体・共用体・多次元配列 (も�
 ----
 
   * Product Name (名称): gogyou (ゴギョウ / 御形 / Gnaphalium affine)
-  * Author (制作者): dearblue &lt;dearblue@users.sourceforge.jp&gt;
+  * Author (制作者): dearblue &lt;dearblue@users.osdn.me&gt;
   * Distribute License (頒布ライセンス): 2-clause BSD License (二条項 BSD ライセンス)
-  * Software Quarity (ソフトウェア品質): alpha
+  * Software Quarity (ソフトウェア品質): EXPERIMENTAL
   * User (想定利用者): Rubyist
-  * Release Number (リリースナンバー): 0.2.3
+  * Release Number (リリースナンバー): 0.2.4
   * Memory Usage (使用メモリ量): 2 MB +
   * Installed Size (インストール容量): under 1 MB
-  * Project Page: &lt;http://sourceforge.jp/projects/rutsubo/&gt;
+  * Project Page: &lt;https://osdn.jp/projects/rutsubo/&gt;
   * Support Ruby: ruby-2.0+ &lt;http://www.ruby-lang.org/&gt;
 
 ## Example
@@ -34,7 +34,7 @@ ruby 構文による、C 言語の構造体・共用体・多次元配列 (も�
 ruby/ruby.h の ``struct RBasic`` と ``struct RObject`` を gogyou を用いて次のように記述出来ます
 (ポインタの定義はできていないため、``uintptr_t`` で置き換えています):
 
-```ruby:ruby
+``` ruby:ruby
 require "gogyou"
 
 module MyRuby
@@ -71,9 +71,15 @@ end
 
 また、ruby がもつ ``p`` メソッドや ``pp`` メソッドでわかりやすく表示されます (gogyou-0.2.3 にて追加)。
 
-```ruby:ruby
+定義した構造体のインスタンスを作成する場合、文字列だけではなく Fiddle::Pointer や FFI::AbstractMemory インスタンスの指定も可能です (gogyou-0.2.4 にて追加)。
+
+``` ruby:ruby
 obj = MyRuby::RObject.new
-# OR obj = MyRuby::RObject.bind("0123456789abcdef" * 2000)  # given any string
+# OR: obj = MyRuby::RObject.bind("0123456789abcdef" * 2000)  # given any string
+# OR: require "gogyou/fiddle"
+#     obj = MyRuby::RObject.bind(Fiddle::Pointer.malloc(MyRuby::RObject.bytesize))
+# OR: require "gogyou/ffi"
+#     obj = MyRuby::RObject.bind(FFI::MemoryPointer.new(MyRuby::RObject.bytesize))
 
 obj.basic.flags = 1234567890
 (obj.basic.klass = 0xaaaaaaaa) rescue p $!  # => EXCEPTION! klass field is immutable
@@ -87,7 +93,7 @@ tmp = obj.as.heap       # get a middle field accessor
 tmp.ivptr = 0x44444444
 p obj.as.heap.ivptr     # => 0x44444444
 
-# following results are in little endian 64 bit enviroment
+# following results are in little endian 64 bit system
 require "pp"
 
 pp obj.bytesize     # => 40
@@ -194,7 +200,7 @@ pp obj              # => #<MyRuby::RObject
 
 最初に gogyou を読み込みます。
 
-```ruby:ruby
+``` ruby:ruby
 require "gogyou"
 ```
 
@@ -202,7 +208,7 @@ require "gogyou"
 
  1. クラスやモジュールの中で ``extend Gogyou`` して、``struct`` (または ``union``) をブロック付きで呼び出し、その戻り値を定数に代入する
 
-    ```ruby:ruby
+    ``` ruby:ruby
     module MyModule
       extend Gogyou
 
@@ -219,7 +225,7 @@ require "gogyou"
 
  2. Gogyou.struct (または Gogyou.union) をブロック付きで呼び出し、その戻り値を定数に代入する
 
-    ```ruby:ruby
+    ``` ruby:ruby
     TypeA = Gogyou.struct {
       int :a
     }
@@ -233,7 +239,7 @@ require "gogyou"
  3. Gogyou::Struct (または Gogyou::Union) を親クラスとしてクラスを定義し、その中で ``struct`` (または ``union``) をブロック付きで呼び出す
     (gogyou-0.2.3 にて追加)
 
-    ```ruby:ruby
+    ``` ruby:ruby
     class TypeA < Gogyou::Struct
       struct {
         int :a
@@ -256,7 +262,7 @@ require "gogyou"
 
 フィールド名はシンボル (または文字列) で与えます。
 
-```ruby:ruby
+``` ruby:ruby
 module MyModule
   extend Gogyou
 
@@ -275,7 +281,7 @@ end
 
 配列として定義する場合は、フィールド名に続く引数として整数値を与えます。
 
-```ruby:ruby
+``` ruby:ruby
 module MyModule
   extend Gogyou
 
@@ -287,7 +293,7 @@ end
 
 多次元配列の場合は、連続して整数値を与えます。
 
-```ruby:ruby
+``` ruby:ruby
 module MyModule
   extend Gogyou
 
@@ -299,7 +305,7 @@ end
 
 配列の場合でも、複数のフィールドを連続してまとめることが出来ます。
 
-```ruby:ruby
+``` ruby:ruby
 module MyModule
   extend Gogyou
 
@@ -318,7 +324,7 @@ struct の最初の引数にブロックを与えること以外は、先に述�
 
 コメントは C 言語で記述した場合の対比としてあります。
 
-```ruby:ruby
+``` ruby:ruby
 module MyModule
   extend Gogyou
 
@@ -332,7 +338,7 @@ end
 
 最初の引数にブロックではなく、型情報としてのオブジェクトを与えることも出来ます。
 
-```ruby:ruby
+``` ruby:ruby
 module MyModule
   extend Gogyou
 
@@ -348,7 +354,7 @@ end
 
 無名構造体の場合、引数は渡さずにブロックを渡すだけです。
 
-```ruby:ruby
+``` ruby:ruby
 module MyModule
   extend Gogyou
 
@@ -436,42 +442,42 @@ end
 
 順を追って説明していきます。
 
-### `.bytesize`
+### ``.bytesize``
 
 このメソッドはその型が必要とする領域のバイト数を正の整数値で返します。
 
 型が拡張構造になっている場合は、最小値となる値を返します。
 
-MD5 を定義する場合、16バイトなので `16` を返します。
+MD5 を定義する場合、16バイトなので ``16`` を返します。
 
-### `.bytealign`
+### ``.bytealign``
 
 このメソッドはその型のアライメントサイズを正の整数値で返します。
 
-MD5 を定義する場合、内部表現は1バイトの塊なので `1` を返します
-(MD5 の実装によっては `4` だったり `8` だったり、はたまた `16` になるかもしれません)。
+MD5 を定義する場合、内部表現は1バイトの塊なので ``1`` を返します
+(MD5 の実装によっては ``4`` だったり ``8`` だったり、はたまた ``16`` になるかもしれません)。
 
-### `.extensible?`
+### ``.extensible?``
 
 このメソッドはその型が常に固定長か、任意に拡張する構造になっているかどうかを返します。
 
-`true` であれば拡張構造であることを意味し、`false` であれば固定長であることを意味します。
+``true`` であれば拡張構造であることを意味し、``false`` であれば固定長であることを意味します。
 
-MD5 は固定長なので、`false` を返します。
+MD5 は固定長なので、``false`` を返します。
 
-### `.aref(buffer, offset)`
+### ``.aref(buffer, offset)``
 
 このメソッドは構造体のフィールドを参照した場合に呼ばれます。
 
-`buffer` は上位構造のバイナリデータとしての String インスタンスです。
+``buffer`` はバイナリデータとしての String インスタンスです (※gogyou-0.2.4 からは Fiddle::Pointer や FFI::AbstractMemory インスタンスである可能性もあります)。
 
-`offset` は上位構造から見た、フィールドの絶対位置をバイト値で表した整数値です。
+``offset`` はバッファ上における、フィールドの絶対位置をバイト値で表した整数値です。
 
 戻り値はその構造体のフィールドに対するインスタンスを返します。
 
-MD5 の場合、`buffer` からデータを切り出して MD5 のインスタンスを返すべきです。
+MD5 の場合、``buffer`` を元にした MD5 のインスタンスを返すべきです。
 
-```ruby:ruby
+``` ruby:ruby
 class MD5
   def self.aref(buffer, offset)
     new(buffer.byteslice(offset, 16))
@@ -479,13 +485,13 @@ class MD5
 end
 ```
 
-もしもインスタンスの変更を反映させる `MD5#[]=` のようなメソッドが必要であるならば、上述したメソッドではうまく行きません。
-理由は `buffer.byteslice` によって `buffer` オブジェクトが切り離されてしまっているからです。
+もしもインスタンスの変更を反映させる ``MD5#[]=`` のようなメソッドが必要であるならば、上述したメソッドではうまく行きません。
+理由は ``buffer.byteslice`` によって ``buffer`` オブジェクトが切り離されてしまっているからです。
 
-クラスを MD5 のデータが保持されるだけの構造から、`buffer` と `offset` を保持する構造に変更する必要があります。
+クラスを MD5 のデータが保持されるだけの構造から、``buffer`` と ``offset`` を保持する構造に変更する必要があります。
 その上でメソッドの定義を変更します。
 
-```ruby:ruby
+``` ruby:ruby
 class MD5
   def self.aref(buffer, offset)
     new(buffer, offset)
@@ -503,27 +509,27 @@ class MD5
 end
 ```
 
-### `.aset(buffer, offset, data)`
+### ``.aset(buffer, offset, data)``
 
 このメソッドは構造体のフィールドへデータを代入した時に呼ばれます。
 
 例えば、`structobj.field = data` のような場合です。
 
-`buffer` は上位構造のバイナリデータとしての String インスタンスです。
+``buffer`` はバイナリデータとしての String インスタンスです (※gogyou-0.2.4 からは他のライブラリが提供するポインタオブジェクトである可能性もあります)。
 
-`offset` は上位構造から見た、フィールドの絶対位置をバイト値で表した整数値です。
+``offset`` はバッファ上における、フィールドの絶対位置をバイト値で表した整数値です。
 
-`data` は代入する値です。
+``data`` は代入する値です。
 
 戻り値は無視されます。
 
-`data` に対してどのような値 (オブジェクト) を受け入れるのかを決定するのは、型情報を定義する側の問題となります。
+``data`` に対してどのような値 (オブジェクト) を受け入れるのかを決定するのは、型情報を定義する側の問題となります。
 
 MD5 の場合、最低でも MD5 インスタンスを受け入れるようにするべきです。
 
-今回は MD5 インスタンスだけではなく 16バイトの文字列、そして `nil` を受け取れるようにしてみます。
+今回は MD5 インスタンスだけではなく 16バイトの文字列、そして ``nil`` を受け取れるようにしてみます。
 
-```ruby:ruby
+``` ruby:ruby
 class MD5
   def self.aset(buffer, offset, data)
     case data
@@ -532,7 +538,7 @@ class MD5
     when String
       buffer.setbinary(offset, data.byteslice(0, 16))
     when nil
-      buffer[offset, 16] = ?0 * 16
+      buffer.setbinary(offset, ?0 * 16)
     else
       raise ArgumentError, "data is not a MD5, String or nil"
     end
@@ -595,9 +601,88 @@ Z = Gogyou.struct {
 ```
 
 
+## Use Fiddle::Pointer or FFI::AbstractMemory as buffer object of struct (構造体のバッファオブジェクトとして Fiddle::Pointer や FFI::AbstractMemory を使う)
+
+構造体の実体となるバッファオブジェクトは、文字列だけではなく Fiddle::Pointer や FFI::AbstractMemory インスタンスを指定することも出来ます (gogyou-0.2.4 にて追加)。
+
+Fiddle::Pointer を利用する場合は、"gogyou/fiddle" を ``require`` する必要があります。
+この時 ``require "fiddle"`` されていなければ "gogyou/fiddle" の内部で ``require`` されます。
+
+あとは作成した構造体に ``bind`` する時、任意の Fiddle::Pointer インスタンスを指定します。
+
+``` ruby:ruby
+require "gogyou/fiddle"
+
+ptr = Fiddle::Pointer.malloc(YourStruct.bytesize)
+data = YourStruct.bind(ptr)
+```
+
+同様に FFI::AbstractMemory (または派生クラス) を利用する場合は、"gogyou/ffi" を ``require`` する必要があります。
+この時 ``require "ffi"`` されていなければ "gogyou/ffi" の内部で ``require`` されます。
+
+あとは作成した構造体に ``bind`` する時、任意の FFI::AbstractMemory (または派生クラス) インスタンスを指定します。
+
+``` ruby:ruby
+require "gogyou/ffi"
+
+ptr = FFI::MemoryPointer.new(YourStruct.bytesize)
+data = YourStruct.bind(ptr)
+```
+
+
 ## Demerit (短所)
 
   * Can't be handled pointer
     (ポインタが扱えない)
+
   * The cost is high for reference/asignment from/to fields
     (フィールドに対する参照・代入のコストが高い)
+
+
+## Available typenames when definision struct (構造体定義の際に利用できる型名)
+
+  * C の型名
+
+                                符号あり    符号なし
+                                ----        ----
+        char 型                 char        uchar
+                                            unsigned_char
+        short 型                short       ushort
+                                            unsigned_short
+        int 型                  int         uint
+                                            unsigned_int
+        long 型                 long        ulong
+                                            unsigned_long
+        long long 型            longlong    ulonglong
+                                long_long   unsigned_long_long
+        sizeof 型               ssize_t     size_t
+        ポインタ整数型          intptr_t    uintptr_t
+        float                   float       N/A
+        double                  double      N/A
+
+  * バイトオーダー環境依存・ビット数環境非依存
+
+                                  バイトオーダー環境依存  バイトオーダー反転
+                                  符号あり    符号なし    符号あり      符号なし
+                                  ----        ----        ----          ----
+        8ビット整数型             int8_t      uint8_t     N/A           N/A
+        16ビット整数型            int16_t     uint16_t    int16_swap    uint16_swap
+        32ビット整数型            int32_t     uint32_t    int32_swap    uint32_swap
+        64ビット整数型            int64_t     uint64_t    int64_swap    uint64_swap
+        16ビット浮動小数点実数型  float16_t   N/A         float16_swap  N/A
+        32ビット浮動小数点実数型  float32_t   N/A         float32_swap  N/A
+        64ビット浮動小数点実数型  float64_t   N/A         float64_swap  N/A
+
+  * バイトオーダー・ビット数環境非依存
+
+                                  ビッグエンディアン      リトルエンディアン
+                                  符号あり    符号なし    符号あり      符号なし
+                                  ----        ----        ----          ----
+        16ビット整数型            int16_be    uint16_be   int16_le      uint16_le
+        24ビット整数型            int24_be    uint24_be   int24_le      uint24_le
+        32ビット整数型            int32_be    uint32_be   int32_le      uint32_le
+        48ビット整数型            int48_be    uint48_be   int48_le      uint48_le
+        64ビット整数型            int64_be    uint64_be   int64_le      uint64_le
+        16ビット浮動小数点実数型  float16_be  N/A         float16_le    N/A
+        32ビット浮動小数点実数型  float32_be  N/A         float32_le    N/A
+        64ビット浮動小数点実数型  float64_be  N/A         float64_le    N/A

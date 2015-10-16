@@ -44,22 +44,58 @@ int64_swap  8 8 store64swap loadi64swap
 uint64_swap 8 8 store64swap loadu64swap
 char      1 1 store8   loadi8
 uchar     1 1 store8   loadu8
-short     2 2 store16  loadi16
-ushort    2 2 store16  loadu16
-int 4 4 store32 loadi32
-uint 4 4 store32 loadu32
-long TypeSpec::SIZEOF_LONG TypeSpec::SIZEOF_LONG store_long load_long
-ulong TypeSpec::SIZEOF_LONG TypeSpec::SIZEOF_LONG store_long load_ulong
-longlong 8 8 store64 loadi64
-ulonglong 8 8 store64 loadu64
-float     4 4 storef32  loadf32
-double    8 8 storef64  loadf64
+short     TypeSpec::SIZEOF_SHORT TypeSpec::SIZEOF_SHORT store_short  load_short
+ushort    TypeSpec::SIZEOF_SHORT TypeSpec::SIZEOF_SHORT store_short  load_ushort
+int       TypeSpec::SIZEOF_INT TypeSpec::SIZEOF_INT store_int load_int
+uint      TypeSpec::SIZEOF_INT TypeSpec::SIZEOF_INT store_int load_uint
+long      TypeSpec::SIZEOF_LONG TypeSpec::SIZEOF_LONG store_long load_long
+ulong     TypeSpec::SIZEOF_LONG TypeSpec::SIZEOF_LONG store_long load_ulong
+longlong  TypeSpec::SIZEOF_LONGLONG TypeSpec::SIZEOF_LONGLONG store_longlong load_longlong
+ulonglong TypeSpec::SIZEOF_LONGLONG TypeSpec::SIZEOF_LONGLONG store_longlong load_ulonglong
+float     TypeSpec::SIZEOF_FLOAT TypeSpec::SIZEOF_FLOAT store_float  load_float
+double    TypeSpec::SIZEOF_DOUBLE TypeSpec::SIZEOF_DOUBLE store_double  load_double
 float_be  4 4 storef32be loadf32be
 double_be 8 8 storef64be  loadf64be
 float_le  4 4 storef32le  loadf32le
 double_le 8 8 storef64le  loadf64le
 float_swap  4 4 storef32swap  loadf32swap
 double_swap 8 8 storef64swap  loadf64swap
+float16_t 2 2 storef16 loadf16
+float16_swap 2 2 storef16swap loadf16swap
+float16_be 2 2 storef16be loadf16be
+float16_le 2 2 storef16le loadf16le
+float32_t 4 4 storef32 loadf32
+float32_swap 4 4 storef32swap loadf32swap
+float32_be 4 4 storef32be loadf32be
+float32_le 4 4 storef32le loadf32le
+float64_t 8 8 storef64 loadf64
+float64_swap 8 8 storef64swap loadf64swap
+float64_be 8 8 storef64be loadf64be
+float64_le 8 8 storef64le loadf64le
+fixed16q8_t 2 2 store16q8 loadi16q8
+fixed16q8_swap 2 2 store16q8swap loadi16q8swap
+fixed16q8_be 2 2 store16q8be loadi16q8be
+fixed16q8_le 2 2 store16q8le loadi16q8le
+fixed32q6_t 4 4 store32q6 loadi32q6
+fixed32q6_swap 4 4 store32q6swap loadi32q6swap
+fixed32q6_be 4 4 store32q6be loadi32q6be
+fixed32q6_le 4 4 store32q6le loadi32q6le
+fixed32q8_t 4 4 store32q8 loadi32q8
+fixed32q8_swap 4 4 store32q8swap loadi32q8swap
+fixed32q8_be 4 4 store32q8be loadi32q8be
+fixed32q8_le 4 4 store32q8le loadi32q8le
+fixed32q12_t 4 4 store32q12 loadi32q12
+fixed32q12_swap 4 4 store32q12swap loadi32q12swap
+fixed32q12_be 4 4 store32q12be loadi32q12be
+fixed32q12_le 4 4 store32q12le loadi32q12le
+fixed32q16_t 4 4 store32q16 loadi32q16
+fixed32q16_swap 4 4 store32q16swap loadi32q16swap
+fixed32q16_be 4 4 store32q16be loadi32q16be
+fixed32q16_le 4 4 store32q16le loadi32q16le
+fixed32q24_t 4 4 store32q24 loadi32q24
+fixed32q24_swap 4 4 store32q24swap loadi32q24swap
+fixed32q24_be 4 4 store32q24be loadi32q24be
+fixed32q24_le 4 4 store32q24le loadi32q24le
 EOS
 
 File.open(path, "wb") do |f|
@@ -71,43 +107,43 @@ File.open(path, "wb") do |f|
 require_relative "typespec"
 
 module Gogyou
-  module Primitives
-    class Primitive < ::Struct.new(:name, :bytesize, :bytealign)
-      BasicStruct = superclass
+  class Primitive < ::Struct.new(:name, :bytesize, :bytealign)
+    BasicStruct = superclass
 
-      undef :name=, :bytesize=, :bytealign=
+    undef :name=, :bytesize=, :bytealign=
 
-      def initialize(name, bytesize, bytealign, aset, aref)
-        super(name.intern, bytesize.to_i, bytealign.to_i)
-        define_singleton_method(:aset, aset)
-        define_singleton_method(:aref, aref)
-      end
-
-      def extensible?
-        false
-      end
-
-      def to_s
-        "\\\#<\#{self.class}:\#{name} bytesize=\#{bytesize.inspect}, bytealign=\#{bytealign.inspect}>"
-      end
-
-      alias inspect to_s
-
-      def pretty_print(q)
-        #name, bytesize, bytealign
-        q.group(1, "\\\#<\#{self.class}:\#{name}") do
-          q.breakable " "
-          q.text "bytesize="
-          q.pp bytesize
-          q.text ","
-          q.breakable " "
-          q.text "bytealign="
-          q.pp bytealign
-        end
-        q.text ">"
-      end
+    def initialize(name, bytesize, bytealign, aset, aref)
+      super(name.intern, bytesize.to_i, bytealign.to_i)
+      define_singleton_method(:aset, aset)
+      define_singleton_method(:aref, aref)
     end
 
+    def extensible?
+      false
+    end
+
+    def to_s
+      "\\\#<\#{self.class}:\#{name} bytesize=\#{bytesize.inspect}, bytealign=\#{bytealign.inspect}>"
+    end
+
+    alias inspect to_s
+
+    def pretty_print(q)
+      #name, bytesize, bytealign
+      q.group(1, "\\\#<\#{self.class}:\#{name}") do
+        q.breakable " "
+        q.text "bytesize="
+        q.pp bytesize
+        q.text ","
+        q.breakable " "
+        q.text "bytealign="
+        q.pp bytealign
+      end
+      q.text ">"
+    end
+  end
+
+  module Primitives
   EOS
 
   records = records.split(/\n/)

@@ -1,5 +1,62 @@
 # gogyou の更新履歴
 
+## gogyou-0.2.4 (2015-10-16)
+
+  * 環境依存の型に対する結果の正確性を修正
+
+    バイトオーダーが環境依存の型に対する値の取得・変更処理をより正確になるように修正しました。
+
+    ただし代入時の CPU 負荷が二倍程度悪化しています。
+
+  * いくつかの ruby 実装に対する修正
+
+    ruby-2.0 はサポート対象としていたにもかかわらず gogyou-0.2.3 で require が失敗してしまった部分を修正しています。
+
+    jruby、rubinius はこれまで確認すらしていませんでしたが、お遊び程度で確認しています
+    (サポート対象となっていないことに注意して下さい)。
+
+  * Gogyou::Accessor::Array#each の追加と Enumerable 化
+
+    Gogyou::Accessor::Array#each を追加し、Enumerabale を include するように変更しました。
+
+    Gogyou::Accessor::Array#each_with_index も追加してあります。
+
+  * Fiddle::Pointer と FFI::AbstractMemory を構造体バッファオブジェクトとして利用可能に
+
+    Fiddle::Pointer と FFI::AbstractMemory のインスタンスを構造体の
+    バッファオブジェクトとして利用できるように機能を追加しました。
+
+  * IEEE 754-2008 に対応した浮動小数点実数型を追加
+
+    IEEE 754-2008 に対応した 16・32・64 ビット精度の浮動小数点実数に対する以下の型を追加しました。
+
+    ``float16_t`` ``float16_swap`` ``float16_be`` ``float16_le``
+    ``float32_t`` ``float32_swap`` ``float32_be`` ``float32_le``
+    ``float64_t`` ``float64_swap`` ``float64_be`` ``float64_le``
+
+  * 固定小数点実数の型名を追加
+
+    16・32 ビット精度の固定小数点実数に対する以下の型を追加しました。
+
+    ``fixed16q8_t`` ``fixed16q8_swap`` ``fixed16q8_be`` ``fixed16q8_le``
+    ``fixed32q6_t`` ``fixed32q6_swap`` ``fixed32q6_be`` ``fixed32q6_le``
+    ``fixed32q8_t`` ``fixed32q8_swap`` ``fixed32q8_be`` ``fixed32q8_le``
+    ``fixed32q12_t`` ``fixed32q12_swap`` ``fixed32q12_be`` ``fixed32q12_le``
+    ``fixed32q16_t`` ``fixed32q16_swap`` ``fixed32q16_be`` ``fixed32q16_le``
+    ``fixed32q24_t`` ``fixed32q24_swap`` ``fixed32q24_be`` ``fixed32q24_le``
+
+    これらは格納する時 (storeXXX) は固定小数点実数として処理されますが、ruby
+    オブジェクトとして取り出す時 (loadXXX) は Float オブジェクトとして処理されます。
+
+  * クラス・モジュール名の変更
+
+    Gogyou::Primitives::Primitive を Gogyou::Primitive に変更しました。
+
+  * いくつかの処理の効率を改善
+
+  * その他問題の修正
+
+
 ## gogyou-0.2.3 (2015-5-17)
 
   * short、int、long、long long のバイト数が環境ごとの値として取得するようになっていなかった問題を修正

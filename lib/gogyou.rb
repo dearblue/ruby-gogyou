@@ -1,8 +1,8 @@
 #vim: set fileencoding:utf-8
 
 # gogyou.rb
-# - AUTHOR: dearblue <dearblue@users.sourceforge.jp>
-# - WEBSIZE: http://sourceforge.jp/projects/rutsubo/
+# - AUTHOR: dearblue <dearblue@users.osdn.me>
+# - WEBSIZE: https://osdn.jp/projects/rutsubo/
 # - LICENSE: same as 2-clause BSD License
 
 #--
@@ -24,42 +24,61 @@
 #
 # 原始的な型情報は Gogyou::Primitives で定義してあり、struct や union メソッド内で利用できる型を次の表に示します:
 #
-# ==== C 標準型
-#                           符号あり    符号なし
-#                           ----        ----
-#   char 型                 char        uchar
-#                                       unsigned_char
-#   short 型                short       ushort
-#                                       unsigned_short
-#   int 型                  int         uint
-#                                       unsigned_int
-#   long 型                 long        ulong
-#                                       unsigned_long
-#   long long 型            longlong    ulonglong
-#                           long_long   unsigned_long_long
-#   sizeof 型               ssize_t     size_t
-#   ポインタ整数型          intptr_t    uintptr_t
+# ==== 型名
 #
-#                           バイトオーダー環境依存  バイトオーダー反転
-#                           符号あり  符号なし      符号あり    符号なし
-#                           ----      ----          ----        ----
-#   8ビット整数型           int8_t    uint8_t       N/A         N/A
-#   16ビット整数型          int16_t   uint16_t      int16_swap  uint16_swap
-#   32ビット整数型          int32_t   uint32_t      int32_swap  uint32_swap
-#   64ビット整数型          int64_t   uint64_t      int64_swap  uint64_swap
-#   32ビット浮動小数点数型  float     N/A           float_swap  N/A
-#   64ビット浮動小数点数型  double    N/A           double_swap N/A
+# * C の型名
+#                               符号あり    符号なし
+#                               ----        ----
+#       char 型                 char        uchar
+#                                           unsigned_char
+#       short 型                short       ushort
+#                                           unsigned_short
+#       int 型                  int         uint
+#                                           unsigned_int
+#       long 型                 long        ulong
+#                                           unsigned_long
+#       long long 型            longlong    ulonglong
+#                               long_long   unsigned_long_long
+#       sizeof 型               ssize_t     size_t
+#       ポインタ整数型          intptr_t    uintptr_t
+#       float                   float       N/A
+#       double                  double      N/A
 #
-#                           ビッグエンディアン    リトルエンディアン
-#                           符号あり  符号なし    符号あり  符号なし
-#                           ----      ----        ----      ----
-#   16ビット整数型          int16_be  uint16_be   int16_le  uint16_le
-#   24ビット整数型          int24_be  uint24_be   int24_le  uint24_le
-#   32ビット整数型          int32_be  uint32_be   int32_le  uint32_le
-#   48ビット整数型          int48_be  uint48_be   int48_le  uint48_le
-#   64ビット整数型          int64_be  uint64_be   int64_le  uint64_le
-#   32ビット浮動小数点数型  float_be  N/A         float_le  N/A
-#   64ビット浮動小数点数型  double_be N/A         double_le N/A
+# * バイトオーダー環境依存・ビット数環境非依存
+#                                 バイトオーダー環境依存  バイトオーダー反転
+#                                 符号あり    符号なし    符号あり      符号なし
+#                                 ----        ----        ----          ----
+#       8ビット整数型             int8_t      uint8_t     N/A           N/A
+#       16ビット整数型            int16_t     uint16_t    int16_swap    uint16_swap
+#       32ビット整数型            int32_t     uint32_t    int32_swap    uint32_swap
+#       64ビット整数型            int64_t     uint64_t    int64_swap    uint64_swap
+#       16ビット浮動小数点実数型  float16_t   N/A         float16_swap  N/A
+#       32ビット浮動小数点実数型  float32_t   N/A         float32_swap  N/A
+#       64ビット浮動小数点実数型  float64_t   N/A         float64_swap  N/A
+#
+# * バイトオーダー・ビット数環境非依存
+#                                 ビッグエンディアン      リトルエンディアン
+#                                 符号あり    符号なし    符号あり      符号なし
+#                                 ----        ----        ----          ----
+#       16ビット整数型            int16_be    uint16_be   int16_le      uint16_le
+#       24ビット整数型            int24_be    uint24_be   int24_le      uint24_le
+#       32ビット整数型            int32_be    uint32_be   int32_le      uint32_le
+#       48ビット整数型            int48_be    uint48_be   int48_le      uint48_le
+#       64ビット整数型            int64_be    uint64_be   int64_le      uint64_le
+#       16ビット浮動小数点実数型  float16_be  N/A         float16_le    N/A
+#       32ビット浮動小数点実数型  float32_be  N/A         float32_le    N/A
+#       64ビット浮動小数点実数型  float64_be  N/A         float64_le    N/A
+#
+# * 固定小数点実数型 (ビット数環境非依存)
+#
+#                                               バイトオーダー環境依存          バイトオーダー環境非依存
+#
+#     16ビット固定小数点実数型(小数部8ビット)   fixed16q8_t   fixed16q8_swap    fixed16q8_be  fixed16q8_le
+#     32ビット固定小数点実数型(小数部6ビット)   fixed32q6_t   fixed32q6_swap    fixed32q6_be  fixed32q6_le
+#     32ビット固定小数点実数型(小数部8ビット)   fixed32q8_t   fixed32q8_swap    fixed32q8_be  fixed32q8_le
+#     32ビット固定小数点実数型(小数部12ビット)  fixed32q12_t  fixed32q12_swap   fixed32q12_be fixed32q12_le
+#     32ビット固定小数点実数型(小数部16ビット)  fixed32q16_t  fixed32q16_swap   fixed32q16_be fixed32q16_le
+#     32ビット固定小数点実数型(小数部24ビット)  fixed32q24_t  fixed32q24_swap   fixed32q24_be fixed32q24_le
 #
 #
 # ==== 利用者定義の型情報
@@ -134,12 +153,19 @@
 #     * #\<field> / #\<field>= - 構造体・共用体のフィールドへの参照・代入メソッド。配列の場合は定義されない。
 #     * #[] / []= - 配列の要素への参照・代入メソッド。構造体・共用体の場合は定義されない。
 #
+# * 構造体のメモリイメージとなるバッファオブジェクト
+#
+#   構造体のバイト列を表現するオブジェクトのことです。
+#
+#   * String
+#   * Fiddle::Pointer
+#
 module Gogyou
   Gogyou = self
 
   require_relative "gogyou/version"
   require_relative "gogyou/typespec"
-  require_relative "gogyou/mixin"
+  require_relative "gogyou/extensions"
   require_relative "gogyou/model"
   require_relative "gogyou/primitives"
   require_relative "gogyou/accessor"
@@ -149,7 +175,7 @@ module Gogyou
 
     Gogyou::Primitives.constants.each do |n|
       prim = Gogyou::Primitives.const_get(n)
-      next unless prim.kind_of?(Gogyou::Primitives::Primitive)
+      next unless prim.kind_of?(Gogyou::Primitive)
       TYPEMAP[prim.name.to_sym] = prim
     end
 

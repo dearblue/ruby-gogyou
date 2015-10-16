@@ -50,9 +50,11 @@ module Gogyou
       @buffer__GOGYOU__
     end
 
-    def to_ptr
-      @buffer__GOGYOU__.to_ptr
+    def to_address
+      @buffer__GOGYOU__.to_address + @offset__GOGYOU__
     end
+
+    alias to_ptr to_address
 
     #
     # call-seq:
@@ -182,7 +184,8 @@ module Gogyou
         define_method(:size__GOGYOU__, -> { fieldsize })
         alias_method(:elementsize, :size__GOGYOU__)
         alias_method(:size, :size__GOGYOU__)
-        model.fields.each do |field|
+        const_set(:GOGYOU_FIELD_TYPES, types = [])
+        model.fields.each_with_index do |field, ifield|
           name = field.name
           name = name.intern
           raise NameError, "already exist field name - #{name}" if namecheck[name]
@@ -190,24 +193,26 @@ module Gogyou
 
           if field.vector
             subarray = define_subarray(field)
-            type = subarray
+            types << subarray
           else
             subarray = nil
-            type = field.type
+            types << field.type
           end
 
-          define_method(field.name, -> {
-            v = type.aref(@buffer__GOGYOU__, @offset__GOGYOU__ + field.offset)
-            v.infect_from(self, buffer) unless v.frozen?
-            v.freeze if frozen? || buffer.frozen? || field.const?
-            v
-          })
+          class_eval <<-EOS, __FILE__, __LINE__ + 1
+            def #{field.name}
+              v = GOGYOU_FIELD_TYPES[#{ifield}].aref(@buffer__GOGYOU__, @offset__GOGYOU__ + #{field.offset})
+              v.taint if !v.frozen? && (tainted? || @buffer__GOGYOU__.tainted?)
+              v.freeze if #{field.const?} || frozen? || @buffer__GOGYOU__.frozen?
+              v
+            end
 
-          define_method("#{field.name}=", ->(value) {
-            raise TypeError, "immutable object (#<%s:0x%08X>.%s)" % [self.class, __id__, field.name], caller(2) if frozen?
-            raise TypeError, "immutable field (#<%s:0x%08X>.%s)" % [self.class, __id__, field.name], caller(2) if field.const?
-            type.aset(@buffer__GOGYOU__, @offset__GOGYOU__ + field.offset, value)
-          })
+            def #{field.name}=(value)
+              raise TypeError, "immutable object (#<%s:0x%08X>)" % [self.class, __id__], caller(1) if frozen?
+              raise TypeError, "immutable field (#<%s:0x%08X>.%s)" % [self.class, __id__, #{field.name.inspect}], caller(1) if #{field.const?}
+              GOGYOU_FIELD_TYPES[#{ifield}].aset(@buffer__GOGYOU__, @offset__GOGYOU__ + #{field.offset}, value)
+            end
+          EOS
         end
       end
     end
@@ -270,6 +275,8 @@ module Gogyou
     end
 
     class Array < BasicArray
+      include Enumerable
+
       def self.elements
         self::ELEMENTS
       end
@@ -300,32 +307,34 @@ module Gogyou
           bytesize = type.bytesize
 
           if model.bytesize == 0
-            define_method(:check_index, ->(index) {
-              index = index.to_i
-              unless index >= 0 && index < self.elementsize
-                raise IndexError, "out of element size (index #{index} for 0 ... #{self.elementsize})", caller(2)
+            class_eval <<-EOS, __FILE__, __LINE__ + 1
+              def check_index(index)
+                index = index.to_i
+                unless index >= 0 && index < elementsize
+                  raise IndexError, "out of element size (index \#{index} for 0 ... \#{elementsize})", caller
+                end
+                index
               end
-              index
-            })
 
-            define_method(:<<, ->(value) {
-              raise TypeError, "immutable object (#<%s:0x%08X>)" % [self.class, __id__], caller(2) if frozen?
-              voff = (@buffer__GOGYOU__.bytesize - @offset__GOGYOU__).align_floor(type.bytesize)
-              expandsize = @offset__GOGYOU__ + voff + type.bytesize
-              @buffer__GOGYOU__.resize(expandsize)
-              type.aset(@buffer__GOGYOU__, @offset__GOGYOU__ + voff, value)
-              self
-            })
+              def <<(value)
+                raise TypeError, "immutable object (#<%s:0x%08X>)" % [self.class, __id__], caller if frozen?
+                voff = (@buffer__GOGYOU__.bytesize - @offset__GOGYOU__).align_floor(SUBTYPE.bytesize)
+                expandsize = @offset__GOGYOU__ + voff + SUBTYPE.bytesize
+                @buffer__GOGYOU__.resize(expandsize)
+                SUBTYPE.aset(@buffer__GOGYOU__, @offset__GOGYOU__ + voff, value)
+                self
+              end
 
-            define_method(:elementsize, -> {
-              (@buffer__GOGYOU__.bytesize - @offset__GOGYOU__).unit_floor(type.bytesize)
-            })
+              def elementsize
+                (@buffer__GOGYOU__.bytesize - @offset__GOGYOU__).unit_floor(SUBTYPE.bytesize)
+              end
 
-            alias_method(:size, :elementsize)
+              alias size elementsize
 
-            define_method(:bytesize, -> {
-              (@buffer__GOGYOU__.bytesize - @offset__GOGYOU__).align_floor(type.bytesize)
-            })
+              def bytesize
+                (@buffer__GOGYOU__.bytesize - @offset__GOGYOU__).align_floor(SUBTYPE.bytesize)
+              end
+            EOS
           else
             eval <<-EOS
               def check_index(index)
@@ -348,21 +357,23 @@ module Gogyou
             EOS
           end
 
-          define_method(:to_s, -> {
-            @buffer__GOGYOU__.byteslice(@offset__GOGYOU__, self.bytesize)
-          })
+          class_eval <<-EOS, __FILE__, __LINE__ + 1
+            def to_s
+              @buffer__GOGYOU__.byteslice(@offset__GOGYOU__, bytesize)
+            end
 
-          define_method(:[], ->(index) {
-            v = type.aref(@buffer__GOGYOU__, @offset__GOGYOU__ + check_index(index) * bytesize)
-            v.infect_from(self, buffer) unless v.frozen?
-            v.freeze if frozen? || buffer.frozen? || field.const?
-            v
-          })
+            def [](index)
+              v = SUBTYPE.aref(@buffer__GOGYOU__, @offset__GOGYOU__ + check_index(index) * #{bytesize})
+              v.infect_from(self, @buffer__GOGYOU__) unless v.frozen?
+              v.freeze if #{field.const?} || frozen? || @buffer__GOGYOU__.frozen?
+              v
+            end
 
-          define_method(:[]=, ->(index, value) {
-            raise TypeError, "immutable object (#<%s:0x%08X>)" % [self.class, __id__, index], caller(2) if frozen? || field.const?
-            type.aset(@buffer__GOGYOU__, @offset__GOGYOU__ + check_index(index) * bytesize, value)
-          })
+            def []=(index, value)
+              raise TypeError, "immutable object (#<%s:0x%08X>)" % [self.class, __id__, index], caller if #{field.const?} || frozen?
+              SUBTYPE.aset(@buffer__GOGYOU__, @offset__GOGYOU__ + check_index(index) * #{bytesize}, value)
+            end
+          EOS
         end
         klass
       end
@@ -386,6 +397,18 @@ module Gogyou
       def bytesize
         return super unless self.class.extensible?
         self.class::BYTESIZE * @buffer__GOGYOU__.bytesize.unit_floor(self.class::SUBTYPE)
+      end
+
+      def each
+        return to_enum unless block_given?
+        elementsize.times { |i| yield self[i] }
+        self
+      end
+
+      def each_with_index
+        return to_enum(:each_with_index) unless block_given?
+        elementsize.times { |i| yield self[i], i }
+        self
       end
 
       def inspect

@@ -18,8 +18,8 @@ The C-liked struct, union and multidimensional array definition are posible in r
 EOS
   s.license = "2-clause BSD License"
   s.author = "dearblue"
-  s.email = "dearblue@users.sourceforge.jp"
-  s.homepage = "http://sourceforge.jp/projects/rutsubo/"
+  s.email = "dearblue@users.osdn.me"
+  s.homepage = "https://osdn.jp/projects/rutsubo/"
 
   s.required_ruby_version = ">= 2.0"
   s.add_development_dependency "rspec", "~> 2.14"
