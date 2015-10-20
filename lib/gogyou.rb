@@ -163,6 +163,12 @@
 module Gogyou
   Gogyou = self
 
+  class PointerError < ::RuntimeError
+  end
+
+  class NullPointerError < PointerError
+  end
+
   require_relative "gogyou/version"
   require_relative "gogyou/typespec"
   require_relative "gogyou/extensions"
@@ -423,6 +429,8 @@ module Gogyou
   # call-seq:
   #   typedef type, aliasname -> self
   #   typedef type, aliasname, *elements -> self
+  #
+  # ***limitation***: not usable the pointer.
   #
   # [type]
   #   This parameter can given a symbol or an object.

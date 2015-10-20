@@ -177,6 +177,12 @@ module Gogyou
       subarray
     end
 
+    def self.define_subpointer(typeobj, constant = false)
+      newtype = Accessor::Pointer.define(typeobj)
+      Accessor.const_set("AnonymousPointer_%08X" % newtype.__id__, newtype)
+      newtype
+    end
+
     def self.define_accessors(accessorclass, model)
       accessorclass.class_eval do
         namecheck = {}
@@ -250,6 +256,114 @@ module Gogyou
     #
     def self.extensible?
       self::EXTENSIBLE
+    end
+
+    class Pointer < Accessor
+      BYTESIZE = Primitives::SIZE_T.bytesize
+      BYTEALIGN = Primitives::SIZE_T.bytealign
+      EXTENSIBLE = false
+
+      def self.aref(buf, off)
+        new(buf, off)
+      end
+
+      def self.aset(buf, off, val)
+        if val.kind_of?(Fixnum)
+          buf.store_sizet(off, val)
+        else
+          raise PointerError, "wrong address (#{val.class} for Fixnum)"
+        end
+
+        buf
+      end
+
+      def self.define(type)
+        require_relative "fiddle" # for Fiddle::Pointer and extend
+
+        Class.new(Pointer) do |t|
+          define_singleton_method(:aset, ->(buf, off, val) {
+            if val.kind_of?(self)
+              addr = val.buffer.load_sizet(val.offset)
+              buf.store_sizet(off, addr)
+            else
+              super
+            end
+
+            buf
+          })
+
+          define_method(:pointer_address, -> {
+            @buffer__GOGYOU__.load_sizet(@offset__GOGYOU__)
+          })
+
+          define_method(:[], ->(*args) {
+            case args.size
+            when 0
+              elem = 0
+            when 1
+              elem = args[0].to_i
+            else
+              raise ArgumentError, "wrong argument size (#{args.size} for 0 .. 1)"
+            end
+            addr = @buffer__GOGYOU__.load_sizet(@offset__GOGYOU__)
+            if addr == 0
+              raise NullPointerError, "nullpo - #<%s:0x%08X>" % [self.class, __id__ << 1]
+            end
+            buf = ::Fiddle::Pointer.new(addr + elem * type.bytesize, type.bytesize)
+            type.aref(buf, 0)
+          })
+
+          define_method(:[]=, ->(*args) {
+            case args.size
+            when 1
+              elem = 0
+              v = args[0]
+            when 2
+              elem = args[0].to_i
+              v = args[1]
+            else
+              raise ArgumentError, "wrong argument size (#{args.size} for 1 .. 2)"
+            end
+
+            addr = @buffer__GOGYOU__.load_sizet(@offset__GOGYOU__)
+            if addr == 0
+              raise NullPointerError, "nullpo - #<%s:0x%08X>" % [self.class, __id__ << 1]
+            end
+            buf = ::Fiddle::Pointer.new(addr + elem * type.bytesize, type.bytesize)
+            type.aset(buf, 0, v)
+            v
+          })
+
+          define_method(:+, ->(elem) {
+            addr = @buffer__GOGYOU__.load_sizet(@offset__GOGYOU__)
+            buf = String.alloc(Primitives::SIZE_T.bytesize)
+            buf.store_sizet(0, addr + elem * type.bytesize)
+            self.class.new(buf, 0)
+          })
+
+          typename = String(type.respond_to?(:name) ? type.name : type) rescue String(type)
+          define_method(:inspect, -> {
+            addr = @buffer__GOGYOU__.load_sizet(@offset__GOGYOU__)
+            "#<*%s:0x%08X>" % [typename, addr]
+          })
+        end
+      end
+
+      #
+      # call-seq:
+      #   self + elem_num -> new pointer object
+      #
+      def +(elem_num)
+        raise NotImplementedError, "this method is shall be defined in sub-class"
+      end
+
+      def -(off)
+        send(:+, -off.to_i)
+      end
+
+      def pretty_print(q)
+        q.text inspect
+      end
     end
 
     class BasicStruct < Accessor

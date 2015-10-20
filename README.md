@@ -23,7 +23,7 @@ ruby 構文による、C 言語の構造体・共用体・多次元配列 (も�
   * Distribute License (頒布ライセンス): 2-clause BSD License (二条項 BSD ライセンス)
   * Software Quarity (ソフトウェア品質): EXPERIMENTAL
   * User (想定利用者): Rubyist
-  * Release Number (リリースナンバー): 0.2.4
+  * Release Number (リリースナンバー): 0.2.5
   * Memory Usage (使用メモリ量): 2 MB +
   * Installed Size (インストール容量): under 1 MB
   * Project Page: &lt;https://osdn.jp/projects/rutsubo/&gt;
@@ -32,7 +32,7 @@ ruby 構文による、C 言語の構造体・共用体・多次元配列 (も�
 ## Example
 
 ruby/ruby.h の ``struct RBasic`` と ``struct RObject`` を gogyou を用いて次のように記述出来ます
-(ポインタの定義はできていないため、``uintptr_t`` で置き換えています):
+(ポインタの定義は ``uintptr_t`` で置き換えています):
 
 ``` ruby:ruby
 require "gogyou"
@@ -54,8 +54,8 @@ module MyRuby
     union -> {
       struct -> {
         long :numiv
-        uintptr_t :ivptr
-        uintptr_t :iv_index_tbl
+        uintptr_t :ivptr        # VALUE *ivptr
+        uintptr_t :iv_index_tbl # struct st_table *iv_index_tbl
       }, :heap
       VALUE :ary, ROBJECT_EMBED_LEN_MAX
     }, :as
@@ -631,9 +631,6 @@ data = YourStruct.bind(ptr)
 
 
 ## Demerit (短所)
-
-  * Can't be handled pointer
-    (ポインタが扱えない)
 
   * The cost is high for reference/asignment from/to fields
     (フィールドに対する参照・代入のコストが高い)

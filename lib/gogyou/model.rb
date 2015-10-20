@@ -360,8 +360,16 @@ module Gogyou
         raise ArgumentError, "nothing argument" if args.empty?
         name = nil
         vector = nil
-        while arg = args.shift
+        args.each do |arg|
           case arg
+          when ::Array  # pointer field
+            yield(name, vector) if name
+            name = nil
+            vector = nil
+            parse!(arg) do |name1, elements|
+              raise ArgumentError, "wrong pointer definision" if name
+              name = Model::Pointer.create(name1, elements)
+            end
           when Symbol, String
             yield(name, vector) if name
             raise ArgumentError, "informal field name (#{arg.to_s})" unless arg =~ FIELDNAME_PATTERN
@@ -369,16 +377,11 @@ module Gogyou
             vector = nil
           when Integer
             raise ArgumentError, "first argument is field name only (#{arg})" unless name
-            raise ArgumentError, "given negative number (#{arg})" unless arg >= 0
+            raise ArgumentError, "can't internal extensible in multi-dimentional array" if vector && vector[-1] < 1
+            v = arg.to_i
+            raise ArgumentError, "given negative number (#{arg})" unless v >= 0
             vector ||= []
-            vector << arg.to_i
-            if vector[-1] == 0
-              yield(name, vector)
-              unless args.empty?
-                raise ArgumentError, "given fields after extensible vector"
-              end
-              return nil
-            end
+            vector << v
           else
             raise ArgumentError, "given any object (#{arg.inspect})"
           end
@@ -399,24 +402,31 @@ module Gogyou
       end
 
       def addfield!(typeobj, packexp, args)
-        #p typeobj
-        # check extensible field  >>>  creator.fields[-1].vector[-1]
-        if (x = fields[-1]) && (x = x.vector) && x[-1] == 0
-          raise ArgumentError, "not given fields after extensible vector"
-        end
-
-        typesize = typeobj.bytesize
-        typealign = [typeobj.bytealign, 1 << packexp].min
+        typesize = typealign = nil # 自己参照構造体を実現するために必要な時に取得する
 
         tmpfields = []
 
         parse!(args) do |name, vect|
-          self.offset = offset.align_ceil(typealign) unless kind_of?(Model::Union::Creator)
-          fields << f = Field[offset, name, vect, typeobj, 0 | packexp]
-          tmpfields << f
-          unless kind_of?(Model::Union::Creator)
-            elements = vect ? vect.inject(1, &:*) : 1
-            self.offset += typesize * elements
+          if name.kind_of?(Model::Pointer::Creator)
+            (name, ptrtype) = name.create(typeobj)
+            self.offset = offset.align_ceil(Primitives::SIZE_T.bytealign) unless kind_of?(Model::Union::Creator)
+            fields << f = Field[offset, name, vect, ptrtype, 0 | packexp]
+            tmpfields << f
+            unless kind_of?(Model::Union::Creator)
+              elements = vect ? vect.inject(1, &:*) : 1
+              self.offset += Primitives::SIZE_T.bytesize * elements
+            end
+          else
+            typesize ||= typeobj.bytesize
+            typealign ||= [typeobj.bytealign, 1 << packexp].min
+
+            self.offset = offset.align_ceil(typealign) unless kind_of?(Model::Union::Creator)
+            fields << f = Field[offset, name, vect, typeobj, 0 | packexp]
+            tmpfields << f
+            unless kind_of?(Model::Union::Creator)
+              elements = vect ? vect.inject(1, &:*) : 1
+              self.offset += typesize * elements
+            end
           end
         end
 
@@ -468,6 +478,27 @@ module Gogyou
             end
           end
         end
+      end
+    end
+
+    class Pointer < Model
+      class Creator < ::Struct.new(:token, :elements)
+        def create(typeobj)
+          name = token
+          if name.kind_of?(Creator)
+            # multiple pointer
+            (name, typeobj) = name.create(typeobj)
+          end
+          if elements && !elements.empty?
+            typeobj = Accessor.define_subarray(Model::Field[0, nil, elements, typeobj, 0])
+          end
+          model = Accessor.define_subpointer(typeobj)
+          [name, model]
+        end
+      end
+
+      def self.create(token, elements)
+        Creator.new(token, elements)
       end
     end
 

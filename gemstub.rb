@@ -10,11 +10,15 @@ The gogyou is a library written at pure ruby that provides auxiliary features of
 
 The C-liked struct, union and multidimensional array definition are posible in ruby syntax.
 
-* Available nested struct and union with anonymous field.
-* Available multidimensional array.
-* Available const field.
-* Available packed field.
-* Available user definition types.
+Available features:
+
+(1) nested struct and union with anonymous field
+(2) multidimensional array
+(3) field of variable array
+(4) const field
+(5) packed field
+(6) user definition types
+(7) (EXPERIMENTAL AND LIMITATION FEATURE) pointer
 EOS
   s.license = "2-clause BSD License"
   s.author = "dearblue"
@@ -25,6 +29,8 @@ EOS
   s.add_development_dependency "rspec", "~> 2.14"
   s.add_development_dependency "rake", "~> 10.0"
 end
+
+DOC << "pointer.ja.md"
 
 primitives = "lib/gogyou/primitives.rb"
 mkprims = "mkprims.rb"

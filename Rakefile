@@ -24,7 +24,8 @@ GEMSTUB.extensions += EXTCONF
 GEMSTUB.executables += FileList["bin/*"].map { |n| File.basename n }
 GEMSTUB.executables.sort!
 
-GEMFILE = "#{GEMSTUB.name}-#{GEMSTUB.version}.gem"
+PACKAGENAME = "#{GEMSTUB.name}-#{GEMSTUB.version}"
+GEMFILE = "#{PACKAGENAME}.gem"
 GEMSPEC = "#{GEMSTUB.name}.gemspec"
 
 GEMSTUB.files += DOC + EXT + EXTCONF + BIN + LIB + SPEC + TEST + EXAMPLE + RAKEFILE + EXTRA
@@ -142,6 +143,11 @@ task gem: GEMFILE
 
 desc "generate gemspec"
 task gemspec: GEMSPEC
+
+desc "print package name"
+task "package-name" do
+  puts PACKAGENAME
+end
 
 file GEMFILE => DOC + EXT + EXTCONF + BIN + LIB + SPEC + TEST + EXAMPLE + RAKEFILE + [GEMSPEC] do
   sh "gem build #{GEMSPEC}"
